@@ -1,0 +1,404 @@
+<div class="space-y-8 animate-fade-in relative pb-12">
+  
+  <!-- Header Section -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+    <div>
+      <h2 class="text-3xl font-bold text-slate-800">{{ 'dashboard.welcome' | translate }}</h2>
+      <p class="text-slate-500 mt-1">{{ 'dashboard.subtitle' | translate }}</p>
+    </div>
+    <div class="mt-4 md:mt-0 text-right">
+      <div class="text-sm text-slate-400 font-medium uppercase tracking-wide">{{ 'dashboard.next_prayer' | translate }}</div>
+      @for (time of prayerService.prayerTimes(); track time.name) {
+        @if (time.isNext) {
+          <div class="text-3xl font-bold text-emerald-600 flex items-center justify-end gap-2">
+            <span>{{ time.name }}</span>
+            <span class="text-slate-800">{{ time.time }}</span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    
+    <!-- Stat Card 1 -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4 relative group">
+      <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl">
+        <i class="fa-solid fa-hourglass-half"></i>
+      </div>
+      <div class="flex-1">
+        <p class="text-sm text-slate-500 font-medium">{{ 'dashboard.total_missed' | translate }}</p>
+        <div class="flex items-baseline gap-2">
+          <p class="text-2xl font-bold text-slate-800">{{ store.totalMissed().toLocaleString() }}</p>
+          <span class="text-xs text-slate-400 font-medium">Salahs</span>
+        </div>
+      </div>
+      <!-- Edit Button -->
+      <button (click)="openEditModal()" class="absolute top-4 right-4 text-slate-300 hover:text-emerald-600 transition p-2" title="Adjust Debt">
+          <i class="fa-solid fa-pen-to-square"></i>
+      </button>
+    </div>
+
+    <!-- Stat Card 2 -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4">
+      <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl">
+        <i class="fa-solid fa-check-double"></i>
+      </div>
+      <div>
+        <p class="text-sm text-slate-500 font-medium">{{ 'dashboard.prayers_made_up' | translate }}</p>
+        <div class="flex items-baseline gap-2">
+           <p class="text-2xl font-bold text-slate-800">{{ store.totalCompleted().toLocaleString() }}</p>
+           <span class="text-xs text-slate-400 font-medium">{{ 'dashboard.done' | translate }}</span>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-1">{{ store.progressPercentage() }}% {{ 'dashboard.debt_cleared' | translate }}</p>
+      </div>
+    </div>
+
+    <!-- Stat Card 3 (Actionable) -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden group">
+        <div class="flex items-center space-x-4 z-10">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center text-xl transition-colors duration-300"
+                 [class.bg-blue-100]="store.userSettings().dailyCapacity <= 2" [class.text-blue-600]="store.userSettings().dailyCapacity <= 2"
+                 [class.bg-purple-100]="store.userSettings().dailyCapacity > 2" [class.text-purple-600]="store.userSettings().dailyCapacity > 2">
+              <i class="fa-solid" [class.fa-calendar-day]="store.userSettings().dailyCapacity <= 2" [class.fa-rocket]="store.userSettings().dailyCapacity > 2"></i>
+            </div>
+            <div>
+              <p class="text-sm text-slate-500 font-medium">{{ 'dashboard.est_completion' | translate }}</p>
+              <p class="text-xl font-bold text-slate-800">{{ store.estimatedCompletionDate() }}</p>
+              <p class="text-[10px] text-slate-400 mt-1">
+                  @if (store.userSettings().dailyCapacity > 2) { 🚀 {{ 'dashboard.sprint_mode' | translate }} } 
+                  @else { 🌱 {{ 'dashboard.steady_mode' | translate }} }
+                  ({{ store.userSettings().dailyCapacity }} {{ 'dashboard.sets_day' | translate }})
+              </p>
+            </div>
+        </div>
+        <button (click)="openPlanModal()" class="z-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full w-10 h-10 flex items-center justify-center transition">
+            <i class="fa-solid fa-gear"></i>
+        </button>
+        <div class="absolute right-0 bottom-0 w-24 h-24 bg-gradient-to-br from-slate-50 to-slate-100 rounded-tl-full opacity-50 -z-0"></div>
+    </div>
+  </div>
+
+  <!-- Today's Times Quick View (Horizontal) -->
+  <div class="bg-white px-6 py-4 rounded-2xl shadow-sm border border-slate-100">
+      <!-- Grid updated to accommodate 7 items (6 prayers + location block) -->
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+         <!-- Updated Location Header (Visible on Mobile) -->
+         <div class="flex flex-col justify-center text-sm font-bold text-slate-500 tracking-wider p-2 border border-transparent">
+            <span class="uppercase text-xs mb-1">{{ 'dashboard.todays_times' | translate }}</span>
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-xs text-emerald-600 font-normal truncate max-w-[100px]" [title]="prayerService.locationName()">
+                  <i class="fa-solid fa-location-dot mr-1"></i> {{ prayerService.locationName() }}
+                </span>
+                <button (click)="openSearchModal()" class="text-slate-300 hover:text-emerald-500 transition w-6 h-6 flex items-center justify-center rounded-full bg-slate-50 hover:bg-emerald-50" title="Change Location">
+                  <i class="fa-solid fa-pen" [class.hidden]="prayerService.isLoading()"></i>
+                  <i class="fa-solid fa-circle-notch fa-spin text-xs" [class.hidden]="!prayerService.isLoading()"></i>
+                </button>
+            </div>
+         </div>
+         
+         @for (pt of prayerService.prayerTimes(); track pt.name) {
+          <div class="flex flex-col items-center justify-center p-2 rounded-lg transition-colors border text-center relative" 
+               [class.bg-emerald-50]="pt.isNext && !pt.isSunrise"
+               [class.border-emerald-200]="pt.isNext && !pt.isSunrise"
+               [class.bg-orange-50]="pt.isSunrise"
+               [class.border-orange-100]="pt.isSunrise"
+               [class.border-slate-50]="!pt.isNext && !pt.isSunrise">
+            
+            <span class="text-xs font-bold uppercase mb-1" 
+                  [class.text-emerald-700]="pt.isNext && !pt.isSunrise"
+                  [class.text-orange-500]="pt.isSunrise" 
+                  [class.text-slate-400]="!pt.isNext && !pt.isSunrise">
+              @if(pt.isSunrise) { <i class="fa-regular fa-sun mr-1"></i> }
+              {{ pt.name }}
+            </span>
+            <span class="font-bold text-slate-700" 
+                  [class.text-emerald-800]="pt.isNext && !pt.isSunrise"
+                  [class.text-orange-700]="pt.isSunrise">
+              {{ pt.time }}
+            </span>
+            
+            @if(pt.isNext && !pt.isSunrise) {
+               <div class="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
+            }
+          </div>
+        }
+      </div>
+  </div>
+
+  <!-- HABIT STACKER WIDGET (NEW) -->
+  @if (!store.userSettings().habitStackingRule) {
+      <!-- Config Mode -->
+      <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden animate-slide-up">
+          <div class="absolute top-0 right-0 p-8 opacity-5">
+              <i class="fa-solid fa-layer-group text-9xl"></i>
+          </div>
+          
+          <div class="relative z-10">
+              <div class="flex items-center gap-3 mb-4">
+                  <div class="bg-emerald-500 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg">
+                    <i class="fa-solid fa-link"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-bold text-lg leading-none">{{ 'dashboard.habit_stacker.title' | translate }}</h3>
+                    <p class="text-slate-400 text-xs mt-1">{{ 'dashboard.habit_stacker.subtitle' | translate }}</p>
+                  </div>
+              </div>
+
+              <div class="bg-white/10 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+                  <div class="flex flex-col md:flex-row items-center gap-2 text-sm md:text-base">
+                      <span class="text-slate-300 font-serif italic">{{ 'dashboard.habit_stacker.formula_pre' | translate }}</span>
+                      
+                      <select [(ngModel)]="habitTrigger" class="bg-slate-700 text-white border-none rounded px-3 py-1 font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+                          <option value="fard_fajr">{{ 'dashboard.habit_stacker.triggers.fard_fajr' | translate }}</option>
+                          <option value="fard_dhuhr">{{ 'dashboard.habit_stacker.triggers.fard_dhuhr' | translate }}</option>
+                          <option value="fard_asr">{{ 'dashboard.habit_stacker.triggers.fard_asr' | translate }}</option>
+                          <option value="fard_maghrib">{{ 'dashboard.habit_stacker.triggers.fard_maghrib' | translate }}</option>
+                          <option value="fard_isha">{{ 'dashboard.habit_stacker.triggers.fard_isha' | translate }}</option>
+                          <option value="wudu">{{ 'dashboard.habit_stacker.triggers.wudu' | translate }}</option>
+                      </select>
+                      
+                      <span class="text-slate-300 font-serif italic">{{ 'dashboard.habit_stacker.formula_mid' | translate }}</span>
+                      
+                      <select [(ngModel)]="habitAction" class="bg-slate-700 text-white border-none rounded px-3 py-1 font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+                          <option value="set_1">{{ 'dashboard.habit_stacker.actions.set_1' | translate }}</option>
+                          <option value="set_2">{{ 'dashboard.habit_stacker.actions.set_2' | translate }}</option>
+                          <option value="only_fard">{{ 'dashboard.habit_stacker.actions.only_fard' | translate }}</option>
+                      </select>
+                      
+                      <span class="text-slate-300 font-serif italic">{{ 'dashboard.habit_stacker.formula_post' | translate }}</span>
+                  </div>
+              </div>
+              
+              <div class="mt-4 flex justify-end">
+                  <button (click)="saveHabitRule()" class="bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-2 px-6 rounded-lg transition shadow-lg text-sm flex items-center gap-2">
+                      <i class="fa-solid fa-check"></i> {{ 'dashboard.habit_stacker.save' | translate }}
+                  </button>
+              </div>
+          </div>
+      </div>
+  } @else {
+      <!-- Active Contract Mode -->
+      <div class="bg-white border-l-4 border-l-emerald-500 rounded-r-xl shadow-sm p-4 flex items-center justify-between group hover:shadow-md transition">
+          <div>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{{ 'dashboard.habit_stacker.my_identity' | translate }}</p>
+              <div class="text-slate-700 font-medium flex flex-wrap gap-1 items-center">
+                  <span class="text-slate-400 italic">{{ 'dashboard.habit_stacker.formula_pre' | translate }}</span>
+                  <span class="font-bold text-emerald-700 bg-emerald-50 px-2 rounded border border-emerald-100">
+                      {{ 'dashboard.habit_stacker.triggers.' + store.userSettings().habitStackingRule?.trigger | translate }}
+                  </span>
+                  <span class="text-slate-400 italic">{{ 'dashboard.habit_stacker.formula_mid' | translate }}</span>
+                  <span class="font-bold text-slate-800 bg-slate-50 px-2 rounded border border-slate-100">
+                      {{ 'dashboard.habit_stacker.actions.' + store.userSettings().habitStackingRule?.action | translate }}
+                  </span>
+                  <span class="text-slate-400 italic">{{ 'dashboard.habit_stacker.formula_post' | translate }}</span>
+              </div>
+          </div>
+          <div class="text-emerald-200 text-3xl opacity-50 group-hover:opacity-100 transition">
+              <i class="fa-solid fa-fingerprint"></i>
+          </div>
+      </div>
+  }
+
+  <!-- Garden of Jannah Visualization -->
+  <app-garden [completedCount]="store.totalCompleted()"></app-garden>
+
+  <!-- Charts (Full Width) -->
+  <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative flex flex-col w-full">
+      <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+        <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-chart-column text-emerald-500"></i>
+            {{ 'dashboard.charts.title' | translate }}
+        </h3>
+        
+        <!-- View Toggle -->
+        <div class="flex bg-slate-100 rounded-lg p-1 gap-1 overflow-x-auto max-w-full custom-scrollbar">
+            <button (click)="toggleChartMode('bar')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'bar'" [class.shadow-sm]="chartMode() === 'bar'" [class.text-slate-800]="chartMode() === 'bar'" [class.text-slate-400]="chartMode() !== 'bar'">
+                <i class="fa-solid fa-chart-simple mr-1"></i> {{ 'dashboard.charts.bar' | translate }}
+            </button>
+            <button (click)="toggleChartMode('radial')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'radial'" [class.shadow-sm]="chartMode() === 'radial'" [class.text-slate-800]="chartMode() === 'radial'" [class.text-slate-400]="chartMode() !== 'radial'">
+                <i class="fa-solid fa-chart-pie mr-1"></i> {{ 'dashboard.charts.radial' | translate }}
+            </button>
+            <button (click)="toggleChartMode('radar')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'radar'" [class.shadow-sm]="chartMode() === 'radar'" [class.text-slate-800]="chartMode() === 'radar'" [class.text-slate-400]="chartMode() !== 'radar'">
+                <i class="fa-solid fa-star-half-stroke mr-1"></i> {{ 'dashboard.charts.quality' | translate }}
+            </button>
+            <button (click)="toggleChartMode('trend')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'trend'" [class.shadow-sm]="chartMode() === 'trend'" [class.text-slate-800]="chartMode() === 'trend'" [class.text-slate-400]="chartMode() !== 'trend'">
+                <i class="fa-solid fa-arrow-trend-up mr-1"></i> {{ 'dashboard.charts.trend' | translate }}
+            </button>
+            <button (click)="toggleChartMode('heatmap')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'heatmap'" [class.shadow-sm]="chartMode() === 'heatmap'" [class.text-slate-800]="chartMode() === 'heatmap'" [class.text-slate-400]="chartMode() !== 'heatmap'">
+                <i class="fa-solid fa-calendar-days mr-1"></i> {{ 'dashboard.charts.habit' | translate }}
+            </button>
+        </div>
+      </div>
+      
+      <!-- Legend for Bar Chart only -->
+      @if(chartMode() === 'bar') {
+        <div class="flex gap-4 text-xs justify-center md:justify-end mb-4 flex-shrink-0 bg-slate-50 p-2 rounded-lg self-end">
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> <strong>{{ 'dashboard.charts.done_legend' | translate }}</strong></div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-red-400"></span> <strong>{{ 'dashboard.charts.remaining_legend' | translate }}</strong></div>
+        </div>
+      }
+
+      <!-- Container: Fixed height with internal scroll -->
+      <div class="w-full bg-slate-50 rounded-xl relative overflow-hidden flex items-center justify-center min-h-[400px]">
+        <div #chartContainer class="w-full h-full min-h-[400px]"></div>
+        
+        <!-- Zero Data State -->
+        @if (store.totalMissed() === 0 && store.totalCompleted() === 0) {
+          <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+             <i class="fa-solid fa-chart-area text-4xl mb-2 opacity-20"></i>
+             <p>{{ 'dashboard.charts.no_data' | translate }}</p>
+             <a routerLink="/calculate" class="text-emerald-600 hover:underline mt-2 text-sm">{{ 'dashboard.charts.go_calc' | translate }}</a>
+          </div>
+        }
+      </div>
+  </div>
+
+  <!-- Plan Adjustment Modal -->
+  @if (isPlanModalOpen()) {
+    <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div class="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">{{ 'dashboard.modals.plan_title' | translate }}</h3>
+                    <p class="text-sm text-slate-500">{{ 'dashboard.modals.plan_subtitle' | translate }}</p>
+                </div>
+                <button (click)="closePlanModal()" class="text-slate-400 hover:text-red-500 transition">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <label class="block text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">{{ 'dashboard.modals.calc_title' | translate }}</label>
+                    <p class="text-sm text-blue-900 mb-2">{{ 'dashboard.modals.calc_desc' | translate }}</p>
+                    <input type="date" 
+                           [ngModel]="tempTargetDate()" 
+                           (change)="onDateChange($event)" 
+                           class="w-full p-2 rounded border border-blue-200 text-sm text-slate-900 bg-white"
+                           style="color-scheme: light;">
+                </div>
+                <div>
+                    <div class="flex justify-between items-end mb-4">
+                        <label class="font-bold text-slate-700">{{ 'dashboard.modals.daily_target' | translate }}</label>
+                        <span class="text-3xl font-bold text-emerald-600">{{ tempCapacity() }} <span class="text-sm text-slate-500 font-normal">{{ 'dashboard.sets_day' | translate }}</span></span>
+                    </div>
+                    <input type="range" min="1" max="20" [(ngModel)]="tempCapacity" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600">
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                <button (click)="closePlanModal()" class="px-4 py-2 text-slate-600 font-medium hover:text-slate-800">{{ 'dashboard.modals.cancel' | translate }}</button>
+                <button (click)="savePlanAdjustment()" class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-lg">{{ 'dashboard.modals.update' | translate }}</button>
+            </div>
+        </div>
+    </div>
+  }
+
+  <!-- Manual Edit Counts Modal -->
+  @if (isEditModalOpen()) {
+    <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">{{ 'dashboard.modals.edit_title' | translate }}</h3>
+                    <p class="text-sm text-slate-500">{{ 'dashboard.modals.edit_subtitle' | translate }}</p>
+                </div>
+                <button (click)="closeEditModal()" class="text-slate-400 hover:text-red-500 transition">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1 space-y-4">
+                <div class="bg-yellow-50 text-yellow-800 p-3 rounded text-sm border border-yellow-100">
+                    <i class="fa-solid fa-circle-info mr-2"></i> 
+                    {{ 'dashboard.modals.edit_hint' | translate }}
+                </div>
+
+                @for(type of prayerTypes; track type) {
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <span class="font-bold text-slate-700 capitalize w-24">{{ type }}</span>
+                        
+                        <div class="flex items-center gap-4">
+                            <span class="text-sm text-slate-400 font-mono w-16 text-right">
+                                {{ getMissedCount(type) }} left
+                            </span>
+                            
+                            <div class="flex items-center bg-white rounded-lg shadow-sm border border-slate-200">
+                                <button (click)="adjustPrayerCount(type, -1)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-600 border-r border-slate-200">
+                                    <i class="fa-solid fa-minus text-xs"></i>
+                                </button>
+                                <button (click)="adjustPrayerCount(type, 1)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-emerald-600">
+                                    <i class="fa-solid fa-plus text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end flex-shrink-0">
+                <button (click)="closeEditModal()" class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700">{{ 'dashboard.modals.done' | translate }}</button>
+            </div>
+        </div>
+    </div>
+  }
+
+  <!-- Location Search Modal -->
+  @if (isSearchModalOpen()) {
+    <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+            <div class="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">{{ 'dashboard.modals.search_title' | translate }}</h3>
+                    <p class="text-sm text-slate-500">{{ 'dashboard.modals.search_subtitle' | translate }}</p>
+                </div>
+                <button (click)="closeSearchModal()" class="text-slate-400 hover:text-red-500 transition">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <!-- Search Box -->
+                <div class="relative mb-4">
+                    <input type="text" [(ngModel)]="searchQuery" (keyup.enter)="searchLocation()"
+                           [placeholder]="'dashboard.modals.search_placeholder' | translate" 
+                           class="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition bg-white text-slate-900"
+                           autofocus>
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-slate-400"></i>
+                    <button (click)="searchLocation()" 
+                            class="absolute right-2 top-2 bg-emerald-600 text-white px-3 py-1 rounded text-sm font-bold hover:bg-emerald-700 transition"
+                            [disabled]="isSearching()">
+                        {{ 'dashboard.modals.search_btn' | translate }}
+                    </button>
+                </div>
+
+                <!-- Results List -->
+                <div class="space-y-2 overflow-y-auto max-h-[300px] custom-scrollbar">
+                    @if (isSearching()) {
+                       <div class="text-center py-8 text-slate-400">
+                          <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2"></i>
+                          <p>{{ 'dashboard.modals.searching' | translate }}</p>
+                       </div>
+                    } @else if (searchResults().length > 0) {
+                        @for (result of searchResults(); track $index) {
+                            <button (click)="selectLocation(result)" class="w-full text-left p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition group">
+                                <p class="font-bold text-slate-800 group-hover:text-emerald-700">{{ result.display_name }}</p>
+                            </button>
+                        }
+                    } @else if (searchQuery() && !isSearching()) {
+                        <div class="text-center py-8 text-slate-400">
+                           <p>{{ 'dashboard.modals.no_results' | translate }}</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+  }
+
+</div>

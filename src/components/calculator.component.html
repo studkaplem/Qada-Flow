@@ -1,0 +1,131 @@
+<div class="max-w-2xl mx-auto space-y-8 animate-fade-in">
+  
+  <div class="text-center">
+    <h2 class="text-3xl font-bold text-slate-800">{{ 'calculator.title' | translate }}</h2>
+    <p class="text-slate-500 mt-2">{{ 'calculator.subtitle' | translate }}</p>
+  </div>
+
+  <!-- Progress Steps -->
+  <div class="flex justify-between items-center relative mb-8">
+    <div class="absolute left-0 right-0 top-1/2 h-1 bg-slate-200 -z-10"></div>
+    
+    <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors duration-300"
+         [class.bg-emerald-600]="step() >= 1" [class.text-white]="step() >= 1"
+         [class.bg-white]="step() < 1" [class.text-slate-400]="step() < 1">1</div>
+    
+    <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors duration-300"
+         [class.bg-emerald-600]="step() >= 2" [class.text-white]="step() >= 2"
+         [class.bg-white]="step() < 2" [class.text-slate-400]="step() < 2">2</div>
+
+    <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors duration-300"
+         [class.bg-emerald-600]="step() >= 3" [class.text-white]="step() >= 3"
+         [class.bg-white]="step() < 3" [class.text-slate-400]="step() < 3">3</div>
+  </div>
+
+  <form [formGroup]="calcForm" class="bg-white p-8 rounded-2xl shadow-lg border border-slate-100">
+    
+    <!-- Step 1: Timeframe -->
+    @if (step() === 1) {
+      <div class="space-y-6">
+        <h3 class="text-xl font-bold text-slate-800">{{ 'calculator.step1' | translate }}</h3>
+        <p class="text-sm text-slate-500">{{ 'calculator.step1_desc' | translate }}</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">{{ 'calculator.start_date' | translate }}</label>
+            <input type="date" formControlName="startDate" 
+                   class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition text-slate-900 bg-white"
+                   style="color-scheme: light;">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">{{ 'calculator.end_date' | translate }}</label>
+            <input type="date" formControlName="endDate" 
+                   class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition text-slate-900 bg-white"
+                   style="color-scheme: light;">
+          </div>
+        </div>
+
+        @if (totalYears > 0) {
+          <div class="p-4 bg-emerald-50 rounded-lg text-emerald-800 text-sm">
+            <i class="fa-solid fa-info-circle mr-2"></i> {{ 'calculator.duration' | translate }} <strong>{{ totalYears }} {{ 'calculator.years' | translate }}</strong>
+          </div>
+        }
+
+        <div class="flex justify-end pt-4">
+          <button type="button" (click)="nextStep()" [disabled]="calcForm.get('startDate')?.invalid || calcForm.get('endDate')?.invalid" 
+                  class="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+            {{ 'calculator.next_btn' | translate }}
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Step 2: Adjustments -->
+    @if (step() === 2) {
+      <div class="space-y-6">
+        <h3 class="text-xl font-bold text-slate-800">{{ 'calculator.step2' | translate }}</h3>
+        <p class="text-sm text-slate-500">{{ 'calculator.step2_desc' | translate }}</p>
+
+        <div class="flex items-center space-x-3 mb-4">
+          <input type="checkbox" id="isFemale" formControlName="isFemale" class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500">
+          <label for="isFemale" class="text-slate-700 font-medium">{{ 'calculator.is_female' | translate }}</label>
+        </div>
+
+        @if (calcForm.get('isFemale')?.value) {
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">{{ 'calculator.cycle_days' | translate }}</label>
+            <input type="number" formControlName="menstruationDays" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition">
+            <p class="text-xs text-slate-400 mt-1">{{ 'calculator.cycle_hint' | translate }}</p>
+          </div>
+        }
+
+        <div class="pt-4 border-t">
+          <label class="block text-sm font-medium text-slate-700 mb-1">{{ 'calculator.daily_capacity' | translate }}</label>
+          <p class="text-xs text-slate-500 mb-2">{{ 'calculator.capacity_hint' | translate }}</p>
+          <select formControlName="dailyCapacity" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition bg-white text-slate-900">
+            <option [value]="1">{{ 'calculator.cap_1' | translate }}</option>
+            <option [value]="2">{{ 'calculator.cap_2' | translate }}</option>
+            <option [value]="3">{{ 'calculator.cap_3' | translate }}</option>
+            <option [value]="5">{{ 'calculator.cap_5' | translate }}</option>
+          </select>
+        </div>
+
+        <div class="flex justify-between pt-4">
+          <button type="button" (click)="prevStep()" class="text-slate-500 hover:text-slate-800 px-4 py-2 font-medium">{{ 'calculator.back_btn' | translate }}</button>
+          <button type="button" (click)="nextStep()" class="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-emerald-700 transition">{{ 'calculator.next_btn' | translate }}</button>
+        </div>
+      </div>
+    }
+
+    <!-- Step 3: Confirmation -->
+    @if (step() === 3) {
+      <div class="space-y-6 text-center">
+        <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+          <i class="fa-solid fa-check"></i>
+        </div>
+        <h3 class="text-xl font-bold text-slate-800">{{ 'calculator.step3' | translate }}</h3>
+        <p class="text-slate-600">
+          {{ 'calculator.step3_desc' | translate }}
+        </p>
+        
+        <div class="bg-slate-50 p-4 rounded-lg text-left text-sm space-y-2">
+          <div class="flex justify-between">
+            <span class="text-slate-500">{{ 'calculator.duration' | translate }}</span>
+            <span class="font-bold text-slate-700">{{ totalYears }} {{ 'calculator.years' | translate }}</span>
+          </div>
+          <div class="flex justify-between">
+             <span class="text-slate-500">Daily Target:</span>
+             <span class="font-bold text-slate-700">+{{ calcForm.value.dailyCapacity }} set(s)</span>
+          </div>
+        </div>
+
+        <div class="flex justify-between pt-4">
+          <button type="button" (click)="prevStep()" class="text-slate-500 hover:text-slate-800 px-4 py-2 font-medium">{{ 'calculator.back_btn' | translate }}</button>
+          <button type="button" (click)="calculate()" class="bg-emerald-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-emerald-700 hover:shadow-xl transform hover:-translate-y-0.5 transition-all">
+            {{ 'calculator.generate_btn' | translate }}
+          </button>
+        </div>
+      </div>
+    }
+  </form>
+</div>

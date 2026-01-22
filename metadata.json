@@ -1,0 +1,5 @@
+{
+  "name": "Qada Flow",
+  "description": "An intelligent prayer tracker and Qada' (missed prayer) planner for Muslims. Features adaptive scheduling, daily tracking, and progress visualization.",
+  "requestFramePermissions": []
+}

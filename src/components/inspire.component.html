@@ -1,0 +1,173 @@
+<div class="space-y-8 animate-fade-in max-w-6xl mx-auto pb-12">
+  
+  <!-- Header & Hero -->
+  <div class="text-center space-y-4">
+    <h2 class="text-3xl font-bold text-slate-800">{{ 'inspire.title' | translate }}</h2>
+    <p class="text-slate-500 max-w-2xl mx-auto">
+      {{ 'inspire.subtitle' | translate }}
+    </p>
+  </div>
+
+  <!-- Hero Quote Card -->
+  <div class="bg-gradient-to-r from-emerald-800 to-emerald-600 rounded-2xl p-8 md:p-12 text-center text-white shadow-xl relative overflow-hidden transform hover:scale-[1.01] transition duration-500">
+    <i class="fa-solid fa-quote-left text-6xl text-emerald-500 opacity-30 absolute top-4 left-4"></i>
+    <div class="relative z-10">
+      <p class="text-2xl md:text-3xl font-serif leading-relaxed mb-4">
+        "{{ dailyQuote().text }}"
+      </p>
+      <div class="inline-block border-t border-emerald-400 pt-2 mt-2">
+        <p class="text-sm font-bold tracking-wider uppercase text-emerald-100">{{ dailyQuote().source }}</p>
+      </div>
+    </div>
+    <i class="fa-solid fa-quote-right text-6xl text-emerald-500 opacity-30 absolute bottom-4 right-4"></i>
+    
+    <!-- Decorative circles -->
+    <div class="absolute -top-12 -right-12 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
+    <div class="absolute -bottom-12 -left-12 w-40 h-40 bg-emerald-400 opacity-10 rounded-full blur-2xl"></div>
+  </div>
+
+  <!-- Filter Navigation -->
+  <div class="flex flex-wrap justify-center gap-3 sticky top-0 z-20 py-2 bg-slate-50/90 backdrop-blur-sm rounded-lg">
+    <button (click)="setFilter('all')" 
+            class="px-5 py-2 rounded-full text-sm font-bold transition-all border"
+            [class.bg-slate-800]="activeFilter() === 'all'" [class.text-white]="activeFilter() === 'all'" [class.border-slate-800]="activeFilter() === 'all'"
+            [class.bg-white]="activeFilter() !== 'all'" [class.text-slate-600]="activeFilter() !== 'all'" [class.border-slate-200]="activeFilter() !== 'all'">
+      {{ 'inspire.filter_all' | translate }}
+    </button>
+    <button (click)="setFilter('islamic')" 
+            class="px-5 py-2 rounded-full text-sm font-bold transition-all border flex items-center gap-2"
+            [class.bg-emerald-600]="activeFilter() === 'islamic'" [class.text-white]="activeFilter() === 'islamic'" [class.border-emerald-600]="activeFilter() === 'islamic'"
+            [class.bg-white]="activeFilter() !== 'islamic'" [class.text-slate-600]="activeFilter() !== 'islamic'" [class.border-slate-200]="activeFilter() !== 'islamic'">
+      <i class="fa-solid fa-moon"></i> {{ 'inspire.filter_islamic' | translate }}
+    </button>
+    <button (click)="setFilter('science')" 
+            class="px-5 py-2 rounded-full text-sm font-bold transition-all border flex items-center gap-2"
+            [class.bg-blue-600]="activeFilter() === 'science'" [class.text-white]="activeFilter() === 'science'" [class.border-blue-600]="activeFilter() === 'science'"
+            [class.bg-white]="activeFilter() !== 'science'" [class.text-slate-600]="activeFilter() !== 'science'" [class.border-slate-200]="activeFilter() !== 'science'">
+      <i class="fa-solid fa-brain"></i> {{ 'inspire.filter_science' | translate }}
+    </button>
+    <button (click)="setFilter('practical')" 
+            class="px-5 py-2 rounded-full text-sm font-bold transition-all border flex items-center gap-2"
+            [class.bg-orange-500]="activeFilter() === 'practical'" [class.text-white]="activeFilter() === 'practical'" [class.border-orange-500]="activeFilter() === 'practical'"
+            [class.bg-white]="activeFilter() !== 'practical'" [class.text-slate-600]="activeFilter() !== 'practical'" [class.border-slate-200]="activeFilter() !== 'practical'">
+      <i class="fa-solid fa-person-running"></i> {{ 'inspire.filter_practical' | translate }}
+    </button>
+  </div>
+
+  <!-- Content Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    @for (card of filteredContent(); track card.id) {
+      <div (click)="openCard(card)" class="group bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-all duration-300 flex flex-col cursor-pointer overflow-hidden relative">
+        
+        <!-- Category Stripe -->
+        <div class="h-1 w-full"
+             [class.bg-emerald-500]="card.category === 'islamic'"
+             [class.bg-blue-500]="card.category === 'science'"
+             [class.bg-orange-500]="card.category === 'practical'"></div>
+
+        <div class="p-6 flex flex-col flex-1">
+          <div class="flex justify-between items-start mb-4">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-110"
+                 [class.bg-emerald-50]="card.category === 'islamic'" [class.text-emerald-600]="card.category === 'islamic'"
+                 [class.bg-blue-50]="card.category === 'science'" [class.text-blue-600]="card.category === 'science'"
+                 [class.bg-orange-50]="card.category === 'practical'" [class.text-orange-600]="card.category === 'practical'">
+              <i class="fa-solid" [class]="card.icon"></i>
+            </div>
+            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">
+               {{ card.readTime }} {{ 'inspire.read_time' | translate }}
+            </span>
+          </div>
+          
+          <div class="mb-3">
+             <span class="text-xs font-bold uppercase tracking-wider mb-1 block"
+                   [class.text-emerald-600]="card.category === 'islamic'"
+                   [class.text-blue-600]="card.category === 'science'"
+                   [class.text-orange-600]="card.category === 'practical'">
+               {{ card.category }}
+             </span>
+             <h3 class="font-bold text-slate-800 text-lg leading-tight group-hover:text-emerald-700 transition-colors">{{ card.displayTitle }}</h3>
+          </div>
+          
+          <p class="text-slate-600 text-sm leading-relaxed mb-6 line-clamp-3">
+            {{ card.displayExcerpt }}
+          </p>
+
+          <div class="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between text-sm font-medium">
+             <span class="text-slate-400 group-hover:text-emerald-600 transition flex items-center gap-2">
+               {{ 'inspire.read_article' | translate }} <i class="fa-solid fa-arrow-right text-xs transition-transform group-hover:translate-x-1"></i>
+             </span>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- Article Reader Modal -->
+  @if (selectedCard()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <!-- Backdrop -->
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in" (click)="closeCard()"></div>
+      
+      <!-- Modal Content -->
+      <div class="bg-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl z-10 overflow-hidden flex flex-col animate-slide-up relative">
+        
+        <!-- Modal Header -->
+        <div class="p-6 md:p-8 bg-slate-50 border-b border-slate-100 relative">
+          <button (click)="closeCard()" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white rounded-full shadow-sm text-slate-400 hover:text-red-500 transition">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+          
+          <div class="flex items-center gap-3 mb-4">
+            <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
+                [class.bg-emerald-100]="selectedCard()?.category === 'islamic'" [class.text-emerald-700]="selectedCard()?.category === 'islamic'"
+                [class.bg-blue-100]="selectedCard()?.category === 'science'" [class.text-blue-700]="selectedCard()?.category === 'science'"
+                [class.bg-orange-100]="selectedCard()?.category === 'practical'" [class.text-orange-700]="selectedCard()?.category === 'practical'">
+              {{ selectedCard()?.category }}
+            </span>
+            <span class="text-slate-400 text-xs font-medium"><i class="fa-regular fa-clock mr-1"></i> {{ selectedCard()?.readTime }} {{ 'inspire.read_time' | translate }}</span>
+          </div>
+          
+          <h2 class="text-2xl md:text-3xl font-bold text-slate-800 leading-tight">{{ selectedCard()?.displayTitle }}</h2>
+          @if(selectedCard()?.displaySource) {
+            <p class="text-slate-500 text-sm mt-2 font-medium">Source: {{ selectedCard()?.displaySource }}</p>
+          }
+        </div>
+
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+          <div class="prose prose-emerald max-w-none text-slate-700 leading-relaxed space-y-4">
+             @for (para of selectedCard()?.displayContent; track $index) {
+               <p class="text-lg">{{ para }}</p>
+             }
+          </div>
+
+          <!-- Action Box -->
+          <div class="mt-8 bg-emerald-50 rounded-xl p-6 border border-emerald-100 flex gap-4 items-start">
+             <div class="bg-emerald-200 text-emerald-800 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+               <i class="fa-solid fa-bolt"></i>
+             </div>
+             <div>
+               <h4 class="font-bold text-emerald-900 mb-1">{{ 'inspire.action_step' | translate }}</h4>
+               <p class="text-emerald-800 text-sm">{{ selectedCard()?.displayAction }}</p>
+             </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-4 border-t border-slate-100 bg-white flex justify-end">
+          <button (click)="closeCard()" class="px-6 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition font-medium">
+            {{ 'inspire.close' | translate }}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  }
+
+  <!-- Bottom Encouragement -->
+  <div class="bg-slate-100 rounded-xl p-6 text-center text-slate-600 text-sm border border-slate-200">
+    <i class="fa-solid fa-seedling text-emerald-500 mb-2 text-xl"></i>
+    <p>{{ 'inspire.footer_quote' | translate }}</p>
+  </div>
+
+</div>

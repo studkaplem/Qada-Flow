@@ -1,0 +1,149 @@
+<div class="space-y-8 animate-fade-in max-w-4xl mx-auto min-h-[80vh] flex flex-col justify-center pb-12">
+
+    <!-- Authenticated View -->
+    <div class="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden relative">
+      
+      <!-- Top Background -->
+      <div class="h-40 bg-gradient-to-r from-emerald-900 to-emerald-800 relative">
+        <div class="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')]"></div>
+      </div>
+      
+      <!-- Profile Header / Navigation -->
+      <div class="px-6 md:px-8 relative">
+        <div class="flex flex-col md:flex-row justify-between items-end -mt-12 mb-6 gap-4">
+           <!-- User Info -->
+           <div class="flex items-end gap-4">
+             <div class="w-28 h-28 rounded-2xl border-4 border-white bg-emerald-600 text-white flex items-center justify-center text-4xl font-bold shadow-lg">
+               {{ auth.currentUser()?.user_metadata?.full_name?.charAt(0)?.toUpperCase() }}
+             </div>
+             <div class="mb-2">
+               <h2 class="text-2xl font-bold text-slate-800">{{ auth.currentUser()?.user_metadata?.full_name }}</h2>
+               <p class="text-slate-500 text-sm">{{ auth.currentUser()?.email }}</p>
+             </div>
+           </div>
+
+           <!-- Tabs Navigation -->
+           <div class="flex bg-slate-100 p-1 rounded-lg">
+               <button (click)="setActiveTab('overview')" 
+                       class="px-4 py-2 text-sm font-bold rounded-md transition-all"
+                       [class.bg-white]="activeTab() === 'overview'" 
+                       [class.shadow-sm]="activeTab() === 'overview'" 
+                       [class.text-slate-800]="activeTab() === 'overview'" 
+                       [class.text-slate-500]="activeTab() !== 'overview'">
+                   Overview
+               </button>
+               <button (click)="setActiveTab('settings')" 
+                       class="px-4 py-2 text-sm font-bold rounded-md transition-all"
+                       [class.bg-white]="activeTab() === 'settings'" 
+                       [class.shadow-sm]="activeTab() === 'settings'" 
+                       [class.text-slate-800]="activeTab() === 'settings'" 
+                       [class.text-slate-500]="activeTab() !== 'settings'">
+                   Settings
+               </button>
+           </div>
+        </div>
+        
+        <div class="h-px bg-slate-100 w-full mb-8"></div>
+
+        <!-- TAB CONTENT: OVERVIEW -->
+        @if (activeTab() === 'overview') {
+            <div class="animate-fade-in space-y-8 pb-8">
+                <!-- Account Stats Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-center hover:border-emerald-200 transition">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">{{ 'profile.member_since' | translate }}</p>
+                    <p class="text-lg font-bold text-slate-700 mt-1">
+                      {{ auth.currentUser()?.created_at | date:'mediumDate' }}
+                    </p>
+                  </div>
+                  <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-center hover:border-emerald-200 transition">
+                     <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">{{ 'profile.current_plan' | translate }}</p>
+                     <p class="text-lg font-bold text-slate-700 mt-1">
+                       {{ store.userSettings().dailyCapacity }} {{ 'dashboard.sets_day' | translate }}
+                     </p>
+                  </div>
+                  <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-center hover:border-emerald-200 transition">
+                     <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">{{ 'profile.progress' | translate }}</p>
+                     <p class="text-lg font-bold text-emerald-600 mt-1">
+                       {{ store.progressPercentage() }}%
+                     </p>
+                  </div>
+                </div>
+
+                <!-- Sync Info -->
+                <div class="p-4 bg-blue-50 text-blue-800 rounded-xl text-sm flex items-start gap-4 border border-blue-100">
+                  <div class="bg-blue-200 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-blue-700">
+                      <i class="fa-solid fa-cloud-arrow-up"></i>
+                  </div>
+                  <div>
+                    <p class="font-bold text-base">{{ 'profile.sync_active' | translate }}</p>
+                    <p class="opacity-80 mt-1 leading-relaxed">{{ 'profile.sync_desc' | translate }}</p>
+                  </div>
+                </div>
+            </div>
+        }
+
+        <!-- TAB CONTENT: SETTINGS -->
+        @if (activeTab() === 'settings') {
+            <div class="animate-fade-in space-y-8 pb-8 max-w-2xl">
+                
+                <!-- Feedback Messages -->
+                @if (successMessage()) {
+                    <div class="p-3 bg-emerald-100 text-emerald-700 rounded-lg text-sm border border-emerald-200">
+                        <i class="fa-solid fa-check-circle mr-2"></i> {{ successMessage() }}
+                    </div>
+                }
+                @if (errorMessage()) {
+                    <div class="p-3 bg-red-100 text-red-700 rounded-lg text-sm border border-red-200">
+                        <i class="fa-solid fa-circle-exclamation mr-2"></i> {{ errorMessage() }}
+                    </div>
+                }
+
+                <!-- Edit Profile -->
+                <section>
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Edit Profile</h3>
+                    <form [formGroup]="profileUpdateForm" (ngSubmit)="updateProfile()" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                            <input type="text" formControlName="fullName"
+                                   class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition bg-white text-slate-900">
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="submit" [disabled]="profileUpdateForm.invalid || auth.isLoading()" 
+                                    class="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- App Preferences -->
+                <section>
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">App Settings</h3>
+                    
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="font-bold text-slate-700">Language</p>
+                                <p class="text-xs text-slate-500">Change the application language</p>
+                            </div>
+                            <div class="flex gap-1 bg-slate-100 p-1 rounded">
+                                <button (click)="switchLanguage('de')" class="px-3 py-1 text-xs font-bold rounded" [class.bg-white]="ts.currentLang() === 'de'" [class.shadow-sm]="ts.currentLang() === 'de'">DE</button>
+                                <button (click)="switchLanguage('en')" class="px-3 py-1 text-xs font-bold rounded" [class.bg-white]="ts.currentLang() === 'en'" [class.shadow-sm]="ts.currentLang() === 'en'">EN</button>
+                                <button (click)="switchLanguage('tr')" class="px-3 py-1 text-xs font-bold rounded" [class.bg-white]="ts.currentLang() === 'tr'" [class.shadow-sm]="ts.currentLang() === 'tr'">TR</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Logout Zone -->
+                <section class="pt-8 mt-8 border-t">
+                    <button (click)="onLogout()" class="w-full py-3 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-bold transition">
+                        <i class="fa-solid fa-right-from-bracket mr-2"></i> {{ 'profile.logout' | translate }}
+                    </button>
+                </section>
+            </div>
+        }
+      </div>
+    </div>
+</div>

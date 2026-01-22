@@ -1,0 +1,130 @@
+<div class="h-screen flex flex-col md:flex-row font-sans text-slate-800 overflow-hidden">
+  
+  @if (auth.currentUser()) {
+    <!-- Sidebar (Desktop) -->
+    <aside class="hidden md:flex flex-col w-64 bg-emerald-900 text-white h-full shadow-xl z-20 flex-shrink-0 animate-fade-in">
+      <div class="p-6 flex items-center justify-between border-b border-emerald-800">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">
+            <i class="fa-solid fa-kaaba"></i>
+          </div>
+          <h1 class="text-xl font-bold tracking-tight">Qada' Flow</h1>
+        </div>
+      </div>
+
+      <!-- Lang Switcher -->
+      <div class="px-6 pt-4 flex gap-2">
+        <button (click)="switchLang('de')" class="text-xs font-bold px-2 py-1 rounded border transition-colors"
+          [class.bg-white]="ts.currentLang() === 'de'" [class.text-emerald-900]="ts.currentLang() === 'de'"
+          [class.border-emerald-700]="ts.currentLang() === 'de'" [class.text-emerald-300]="ts.currentLang() !== 'de'" [class.border-emerald-800]="ts.currentLang() !== 'de'">
+          DE
+        </button>
+        <button (click)="switchLang('en')" class="text-xs font-bold px-2 py-1 rounded border transition-colors"
+          [class.bg-white]="ts.currentLang() === 'en'" [class.text-emerald-900]="ts.currentLang() === 'en'"
+          [class.border-emerald-700]="ts.currentLang() === 'en'" [class.text-emerald-300]="ts.currentLang() !== 'en'" [class.border-emerald-800]="ts.currentLang() !== 'en'">
+          EN
+        </button>
+        <button (click)="switchLang('tr')" class="text-xs font-bold px-2 py-1 rounded border transition-colors"
+          [class.bg-white]="ts.currentLang() === 'tr'" [class.text-emerald-900]="ts.currentLang() === 'tr'"
+          [class.border-emerald-700]="ts.currentLang() === 'tr'" [class.text-emerald-300]="ts.currentLang() !== 'tr'" [class.border-emerald-800]="ts.currentLang() !== 'tr'">
+          TR
+        </button>
+      </div>
+
+      <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+        <a routerLink="/dashboard" routerLinkActive="bg-emerald-800 text-emerald-100 shadow-sm" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-emerald-800 transition-all duration-200">
+          <i class="fa-solid fa-chart-pie w-6"></i>
+          <span>{{ 'nav.dashboard' | translate }}</span>
+        </a>
+        <a routerLink="/track" routerLinkActive="bg-emerald-800 text-emerald-100 shadow-sm" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-emerald-800 transition-all duration-200">
+          <i class="fa-solid fa-list-check w-6"></i>
+          <span>{{ 'nav.tracker' | translate }}</span>
+        </a>
+        <a routerLink="/calculate" routerLinkActive="bg-emerald-800 text-emerald-100 shadow-sm" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-emerald-800 transition-all duration-200">
+          <i class="fa-solid fa-calculator w-6"></i>
+          <span>{{ 'nav.calculator' | translate }}</span>
+        </a>
+        <a routerLink="/inspire" routerLinkActive="bg-emerald-800 text-emerald-100 shadow-sm" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-emerald-800 transition-all duration-200">
+          <i class="fa-solid fa-lightbulb w-6"></i>
+          <span>{{ 'nav.inspire' | translate }}</span>
+        </a>
+        <a routerLink="/guide" routerLinkActive="bg-emerald-800 text-emerald-100 shadow-sm" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-emerald-800 transition-all duration-200">
+          <i class="fa-solid fa-book w-6"></i>
+          <span>{{ 'nav.guide' | translate }}</span>
+        </a>
+        
+        <!-- Divider -->
+        <div class="h-px bg-emerald-800 my-2"></div>
+        
+        <!-- Admin Link -->
+        @if (auth.currentUser()?.role === 'admin') {
+          <a routerLink="/admin" routerLinkActive="bg-emerald-800 text-emerald-100 shadow-sm" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-emerald-800 transition-all duration-200 text-emerald-300">
+            <i class="fa-solid fa-lock w-6"></i>
+            <span>Admin Panel</span>
+          </a>
+        }
+
+        <a routerLink="/profile" routerLinkActive="bg-emerald-800 text-emerald-100 shadow-sm" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-emerald-800 transition-all duration-200">
+          <i class="fa-solid fa-user w-6"></i>
+          <span>{{ 'nav.profile' | translate }}</span>
+        </a>
+      </nav>
+
+      <div class="p-4 border-t border-emerald-800 text-emerald-300 text-sm text-center">
+        <p>{{ 'nav.version' | translate }} &copy; 2024</p>
+      </div>
+    </aside>
+
+    <!-- Mobile Header -->
+    <header class="md:hidden bg-emerald-900 text-white p-4 flex justify-between items-center shadow-md z-30 flex-shrink-0 animate-fade-in">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-kaaba text-emerald-400 text-xl"></i>
+        <h1 class="font-bold text-xl">Qada' Flow</h1>
+      </div>
+      <div class="flex gap-4 items-center">
+          <div class="flex gap-1">
+              <button (click)="switchLang('de')" class="text-xs font-bold px-1 py-0.5 rounded border" [class.bg-white]="ts.currentLang() === 'de'" [class.text-emerald-900]="ts.currentLang() === 'de'">DE</button>
+              <button (click)="switchLang('en')" class="text-xs font-bold px-1 py-0.5 rounded border" [class.bg-white]="ts.currentLang() === 'en'" [class.text-emerald-900]="ts.currentLang() === 'en'">EN</button>
+              <button (click)="switchLang('tr')" class="text-xs font-bold px-1 py-0.5 rounded border" [class.bg-white]="ts.currentLang() === 'tr'" [class.text-emerald-900]="ts.currentLang() === 'tr'">TR</button>
+          </div>
+          <button (click)="toggleMenu()" class="text-emerald-100 hover:text-white focus:outline-none">
+          <i class="fa-solid fa-bars text-2xl"></i>
+          </button>
+      </div>
+    </header>
+
+    <!-- Mobile Menu Overlay -->
+    @if (isMobileMenuOpen) {
+      <div class="fixed inset-0 bg-black/50 z-40 md:hidden" (click)="closeMenu()"></div>
+      <div class="fixed inset-y-0 right-0 w-64 bg-emerald-900 text-white z-50 transform transition-transform duration-300 shadow-2xl p-4 flex flex-col">
+        <div class="flex justify-end mb-6">
+          <button (click)="closeMenu()" class="text-white hover:text-emerald-200">
+            <i class="fa-solid fa-xmark text-2xl"></i>
+          </button>
+        </div>
+        <nav class="space-y-4 flex-1">
+          <a routerLink="/dashboard" (click)="closeMenu()" routerLinkActive="bg-emerald-800" class="block px-4 py-3 rounded-lg hover:bg-emerald-800">{{ 'nav.dashboard' | translate }}</a>
+          <a routerLink="/track" (click)="closeMenu()" routerLinkActive="bg-emerald-800" class="block px-4 py-3 rounded-lg hover:bg-emerald-800">{{ 'nav.tracker' | translate }}</a>
+          <a routerLink="/calculate" (click)="closeMenu()" routerLinkActive="bg-emerald-800" class="block px-4 py-3 rounded-lg hover:bg-emerald-800">{{ 'nav.calculator' | translate }}</a>
+          <a routerLink="/inspire" (click)="closeMenu()" routerLinkActive="bg-emerald-800" class="block px-4 py-3 rounded-lg hover:bg-emerald-800">{{ 'nav.inspire' | translate }}</a>
+          <a routerLink="/guide" (click)="closeMenu()" routerLinkActive="bg-emerald-800" class="block px-4 py-3 rounded-lg hover:bg-emerald-800">{{ 'nav.guide' | translate }}</a>
+          
+          <!-- Mobile Admin Link -->
+          @if (auth.currentUser()?.role === 'admin') {
+            <a routerLink="/admin" (click)="closeMenu()" routerLinkActive="bg-emerald-800" class="block px-4 py-3 rounded-lg hover:bg-emerald-800 text-emerald-300">Admin Panel</a>
+          }
+
+          <div class="h-px bg-emerald-800 my-2"></div>
+          <a routerLink="/profile" (click)="closeMenu()" routerLinkActive="bg-emerald-800" class="block px-4 py-3 rounded-lg hover:bg-emerald-800">{{ 'nav.profile' | translate }}</a>
+        </nav>
+      </div>
+    }
+  }
+
+  <!-- Main Content Area -->
+  <main class="flex-1 flex flex-col overflow-hidden relative">
+      <div class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+          <router-outlet></router-outlet>
+      </div>
+  </main>
+</div>
