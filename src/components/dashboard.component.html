@@ -48,10 +48,10 @@
       <div>
         <p class="text-sm text-slate-500 font-medium">{{ 'dashboard.prayers_made_up' | translate }}</p>
         <div class="flex items-baseline gap-2">
-           <p class="text-2xl font-bold text-slate-800">{{ store.totalCompleted().toLocaleString() }}</p>
+           <p class="text-2xl font-bold text-slate-800">{{ totalCompleted().toLocaleString() }}</p>
            <span class="text-xs text-slate-400 font-medium">{{ 'dashboard.done' | translate }}</span>
         </div>
-        <p class="text-[10px] text-slate-400 mt-1">{{ store.progressPercentage() }}% {{ 'dashboard.debt_cleared' | translate }}</p>
+        <p class="text-[10px] text-slate-400 mt-1">{{ progressPercentage() }}% {{ 'dashboard.debt_cleared' | translate }}</p>
       </div>
     </div>
 
@@ -59,17 +59,17 @@
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden group">
         <div class="flex items-center space-x-4 z-10">
             <div class="w-12 h-12 rounded-full flex items-center justify-center text-xl transition-colors duration-300"
-                 [class.bg-blue-100]="store.userSettings().dailyCapacity <= 2" [class.text-blue-600]="store.userSettings().dailyCapacity <= 2"
-                 [class.bg-purple-100]="store.userSettings().dailyCapacity > 2" [class.text-purple-600]="store.userSettings().dailyCapacity > 2">
-              <i class="fa-solid" [class.fa-calendar-day]="store.userSettings().dailyCapacity <= 2" [class.fa-rocket]="store.userSettings().dailyCapacity > 2"></i>
+                 [class.bg-blue-100]="store.settings().dailyCapacity <= 2" [class.text-blue-600]="store.settings().dailyCapacity <= 2"
+                 [class.bg-purple-100]="store.settings().dailyCapacity > 2" [class.text-purple-600]="store.settings().dailyCapacity > 2">
+              <i class="fa-solid" [class.fa-calendar-day]="store.settings().dailyCapacity <= 2" [class.fa-rocket]="store.settings().dailyCapacity > 2"></i>
             </div>
             <div>
               <p class="text-sm text-slate-500 font-medium">{{ 'dashboard.est_completion' | translate }}</p>
-              <p class="text-xl font-bold text-slate-800">{{ store.estimatedCompletionDate() }}</p>
+              <p class="text-xl font-bold text-slate-800">{{ estimatedCompletionDate() }}</p>
               <p class="text-[10px] text-slate-400 mt-1">
-                  @if (store.userSettings().dailyCapacity > 2) { 🚀 {{ 'dashboard.sprint_mode' | translate }} } 
+                  @if (store.settings().dailyCapacity > 2) { 🚀 {{ 'dashboard.sprint_mode' | translate }} } 
                   @else { 🌱 {{ 'dashboard.steady_mode' | translate }} }
-                  ({{ store.userSettings().dailyCapacity }} {{ 'dashboard.sets_day' | translate }})
+                  ({{ store.settings().dailyCapacity }} {{ 'dashboard.sets_day' | translate }})
               </p>
             </div>
         </div>
@@ -128,7 +128,7 @@
   </div>
 
   <!-- HABIT STACKER WIDGET (NEW) -->
-  @if (!store.userSettings().habitStackingRule) {
+  @if (!store.settings().habitStackingRule) {
       <!-- Config Mode -->
       <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden animate-slide-up">
           <div class="absolute top-0 right-0 p-8 opacity-5">
@@ -186,11 +186,11 @@
               <div class="text-slate-700 font-medium flex flex-wrap gap-1 items-center">
                   <span class="text-slate-400 italic">{{ 'dashboard.habit_stacker.formula_pre' | translate }}</span>
                   <span class="font-bold text-emerald-700 bg-emerald-50 px-2 rounded border border-emerald-100">
-                      {{ 'dashboard.habit_stacker.triggers.' + store.userSettings().habitStackingRule?.trigger | translate }}
+                      {{ 'dashboard.habit_stacker.triggers.' + store.settings().habitStackingRule?.trigger | translate }}
                   </span>
                   <span class="text-slate-400 italic">{{ 'dashboard.habit_stacker.formula_mid' | translate }}</span>
                   <span class="font-bold text-slate-800 bg-slate-50 px-2 rounded border border-slate-100">
-                      {{ 'dashboard.habit_stacker.actions.' + store.userSettings().habitStackingRule?.action | translate }}
+                      {{ 'dashboard.habit_stacker.actions.' + store.settings().habitStackingRule?.action | translate }}
                   </span>
                   <span class="text-slate-400 italic">{{ 'dashboard.habit_stacker.formula_post' | translate }}</span>
               </div>
@@ -202,7 +202,7 @@
   }
 
   <!-- Garden of Jannah Visualization -->
-  <app-garden [completedCount]="store.totalCompleted()"></app-garden>
+  <app-garden [completedCount]="totalCompleted()"></app-garden>
 
   <!-- Charts (Full Width) -->
   <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative flex flex-col w-full">
@@ -214,26 +214,51 @@
         
         <!-- View Toggle -->
         <div class="flex bg-slate-100 rounded-lg p-1 gap-1 overflow-x-auto max-w-full custom-scrollbar">
-            <button (click)="toggleChartMode('bar')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
-                    [class.bg-white]="chartMode() === 'bar'" [class.shadow-sm]="chartMode() === 'bar'" [class.text-slate-800]="chartMode() === 'bar'" [class.text-slate-400]="chartMode() !== 'bar'">
+            <button (click)="toggleChartMode('bar')"
+                    class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'bar'"
+                    [class.shadow-sm]="chartMode() === 'bar'"
+                    [class.text-slate-800]="chartMode() === 'bar'"
+                    [class.text-slate-400]="chartMode() !== 'bar'">
                 <i class="fa-solid fa-chart-simple mr-1"></i> {{ 'dashboard.charts.bar' | translate }}
             </button>
-            <button (click)="toggleChartMode('radial')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
-                    [class.bg-white]="chartMode() === 'radial'" [class.shadow-sm]="chartMode() === 'radial'" [class.text-slate-800]="chartMode() === 'radial'" [class.text-slate-400]="chartMode() !== 'radial'">
+
+            <button (click)="toggleChartMode('radial')"
+                    class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'radial'"
+                    [class.shadow-sm]="chartMode() === 'radial'"
+                    [class.text-slate-800]="chartMode() === 'radial'"
+                    [class.text-slate-400]="chartMode() !== 'radial'">
                 <i class="fa-solid fa-chart-pie mr-1"></i> {{ 'dashboard.charts.radial' | translate }}
             </button>
-            <button (click)="toggleChartMode('radar')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
-                    [class.bg-white]="chartMode() === 'radar'" [class.shadow-sm]="chartMode() === 'radar'" [class.text-slate-800]="chartMode() === 'radar'" [class.text-slate-400]="chartMode() !== 'radar'">
+
+            <button (click)="toggleChartMode('radar')"
+                    class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'radar'"
+                    [class.shadow-sm]="chartMode() === 'radar'"
+                    [class.text-slate-800]="chartMode() === 'radar'"
+                    [class.text-slate-400]="chartMode() !== 'radar'">
                 <i class="fa-solid fa-star-half-stroke mr-1"></i> {{ 'dashboard.charts.quality' | translate }}
             </button>
-            <button (click)="toggleChartMode('trend')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
-                    [class.bg-white]="chartMode() === 'trend'" [class.shadow-sm]="chartMode() === 'trend'" [class.text-slate-800]="chartMode() === 'trend'" [class.text-slate-400]="chartMode() !== 'trend'">
+
+            <button (click)="toggleChartMode('trend')"
+                    class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'trend'"
+                    [class.shadow-sm]="chartMode() === 'trend'"
+                    [class.text-slate-800]="chartMode() === 'trend'"
+                    [class.text-slate-400]="chartMode() !== 'trend'">
                 <i class="fa-solid fa-arrow-trend-up mr-1"></i> {{ 'dashboard.charts.trend' | translate }}
             </button>
-            <button (click)="toggleChartMode('heatmap')" class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
-                    [class.bg-white]="chartMode() === 'heatmap'" [class.shadow-sm]="chartMode() === 'heatmap'" [class.text-slate-800]="chartMode() === 'heatmap'" [class.text-slate-400]="chartMode() !== 'heatmap'">
+
+            <button (click)="toggleChartMode('heatmap')"
+            class="px-4 py-2 text-xs font-bold rounded-md transition whitespace-nowrap"
+                    [class.bg-white]="chartMode() === 'heatmap'"
+                    [class.shadow-sm]="chartMode() === 'heatmap'"
+                    [class.text-slate-800]="chartMode() === 'heatmap'"
+                    [class.text-slate-400]="chartMode() !== 'heatmap'">
                 <i class="fa-solid fa-calendar-days mr-1"></i> {{ 'dashboard.charts.habit' | translate }}
             </button>
+            
         </div>
       </div>
       
@@ -250,7 +275,7 @@
         <div #chartContainer class="w-full h-full min-h-[400px]"></div>
         
         <!-- Zero Data State -->
-        @if (store.totalMissed() === 0 && store.totalCompleted() === 0) {
+        @if (store.totalMissed() === 0 && totalCompleted() === 0) {
           <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
              <i class="fa-solid fa-chart-area text-4xl mb-2 opacity-20"></i>
              <p>{{ 'dashboard.charts.no_data' | translate }}</p>
@@ -262,39 +287,81 @@
 
   <!-- Plan Adjustment Modal -->
   @if (isPlanModalOpen()) {
-    <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+    <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition scale-100">
+            
             <div class="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center">
                 <div>
                     <h3 class="text-xl font-bold text-slate-800">{{ 'dashboard.modals.plan_title' | translate }}</h3>
                     <p class="text-sm text-slate-500">{{ 'dashboard.modals.plan_subtitle' | translate }}</p>
                 </div>
-                <button (click)="closePlanModal()" class="text-slate-400 hover:text-red-500 transition">
-                    <i class="fa-solid fa-xmark text-2xl"></i>
+                <button (click)="isPlanModalOpen.set(false)" class="text-slate-400 hover:text-rose-500 transition w-8 h-8 flex items-center justify-center rounded-full hover:bg-rose-50">
+                    <i class="fa-solid fa-xmark text-xl"></i>
                 </button>
             </div>
-            <div class="p-6 space-y-6">
-                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                    <label class="block text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">{{ 'dashboard.modals.calc_title' | translate }}</label>
-                    <p class="text-sm text-blue-900 mb-2">{{ 'dashboard.modals.calc_desc' | translate }}</p>
-                    <input type="date" 
-                           [ngModel]="tempTargetDate()" 
-                           (change)="onDateChange($event)" 
-                           class="w-full p-2 rounded border border-blue-200 text-sm text-slate-900 bg-white"
-                           style="color-scheme: light;">
+
+            <div class="p-6 space-y-8">
+                
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 relative">
+                    <label class="block text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">
+                        {{ 'dashboard.modals.calc_title' | translate }}
+                    </label>
+                    <p class="text-sm text-blue-900/80 mb-3 leading-relaxed">
+                        {{ 'dashboard.modals.calc_desc' | translate }}
+                    </p>
+                    
+                    <div class="relative">
+                        <input type="date" 
+                               [ngModel]="tempTargetDate()" 
+                               (ngModelChange)="updateTargetDate($event)" 
+                               class="w-full p-3 pl-10 rounded-lg border border-blue-200 text-sm font-bold text-slate-700 bg-white focus:ring-2 focus:ring-blue-400 outline-none shadow-sm transition"
+                               style="color-scheme: light;">
+                        <i class="fa-regular fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-blue-400"></i>
+                    </div>
                 </div>
+
                 <div>
                     <div class="flex justify-between items-end mb-4">
-                        <label class="font-bold text-slate-700">{{ 'dashboard.modals.daily_target' | translate }}</label>
-                        <span class="text-3xl font-bold text-emerald-600">{{ tempCapacity() }} <span class="text-sm text-slate-500 font-normal">{{ 'dashboard.sets_day' | translate }}</span></span>
+                        <label class="font-bold text-slate-700 text-lg">
+                            {{ 'dashboard.modals.daily_target' | translate }}
+                        </label>
                     </div>
-                    <input type="range" min="1" max="20" [(ngModel)]="tempCapacity" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600">
+
+                    <div class="flex justify-center bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                        <div class="flex items-center gap-6">
+                            <button (click)="updateCapacity(tempCapacity() - 1)" 
+                                    [disabled]="tempCapacity() <= 1" 
+                                    class="w-12 h-12 rounded-xl bg-white text-slate-600 shadow-sm hover:bg-slate-100 disabled:opacity-50 font-bold text-xl flex items-center justify-center transition border border-slate-200 group">
+                                <i class="fa-solid fa-minus group-hover:scale-110 transition"></i>
+                            </button>
+                            
+                            <div class="text-center w-32">
+                                <span class="text-4xl font-bold text-slate-800 block">{{ tempCapacity() }}</span>
+                                <span class="text-xs text-slate-400 uppercase tracking-wider font-bold">
+                                    {{ 'dashboard.sets_day' | translate }}
+                                </span>
+                            </div>
+                            
+                            <button (click)="updateCapacity(tempCapacity() + 1)" 
+                                    class="w-12 h-12 rounded-xl bg-emerald-500 text-white shadow-md shadow-emerald-200 hover:bg-emerald-600 font-bold text-xl flex items-center justify-center transition group">
+                                <i class="fa-solid fa-plus group-hover:scale-110 transition"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
             </div>
+
             <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                <button (click)="closePlanModal()" class="px-4 py-2 text-slate-600 font-medium hover:text-slate-800">{{ 'dashboard.modals.cancel' | translate }}</button>
-                <button (click)="savePlanAdjustment()" class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-lg">{{ 'dashboard.modals.update' | translate }}</button>
+                <button (click)="isPlanModalOpen.set(false)" class="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-lg transition">
+                    {{ 'dashboard.modals.cancel' | translate }}
+                </button>
+                <button (click)="savePlan()" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition flex items-center gap-2">
+                    <i class="fa-solid fa-check"></i>
+                    {{ 'dashboard.modals.update' | translate }}
+                </button>
             </div>
+
         </div>
     </div>
   }
@@ -320,22 +387,19 @@
                 </div>
 
                 @for(type of prayerTypes; track type) {
-                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                        <span class="font-bold text-slate-700 capitalize w-24">{{ type }}</span>
-                        
-                        <div class="flex items-center gap-4">
-                            <span class="text-sm text-slate-400 font-mono w-16 text-right">
-                                {{ getMissedCount(type) }} left
-                            </span>
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition">
+                        <span class="font-medium text-slate-600 capitalize pl-2">{{ type }}</span>
+                        <div class="flex items-center gap-1 bg-white rounded-lg shadow-sm p-1">
                             
-                            <div class="flex items-center bg-white rounded-lg shadow-sm border border-slate-200">
-                                <button (click)="adjustPrayerCount(type, -1)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-600 border-r border-slate-200">
-                                    <i class="fa-solid fa-minus text-xs"></i>
-                                </button>
-                                <button (click)="adjustPrayerCount(type, 1)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-emerald-600">
-                                    <i class="fa-solid fa-plus text-xs"></i>
-                                </button>
-                            </div>
+                            <button (click)="adjustPrayer(type, -1)" class="w-8 h-8 rounded-md hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition flex items-center justify-center">
+                                <i class="fa-solid fa-minus text-xs"></i>
+                            </button>
+                            
+                            <span class="font-bold text-slate-800 w-10 text-center text-sm">{{ getCount(type) }}</span>
+                            
+                            <button (click)="adjustPrayer(type, 1)" class="w-8 h-8 rounded-md hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition flex items-center justify-center">
+                                <i class="fa-solid fa-plus text-xs"></i>
+                            </button>
                         </div>
                     </div>
                 }

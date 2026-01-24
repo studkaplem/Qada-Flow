@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, effect, inject, signal, HostListener, OnDestroy } from '@angular/core';
+import { Component, ElementRef, ViewChild, effect, inject, signal, HostListener, computed, OnDestroy } from '@angular/core';
 import { StoreService, PrayerCounts } from '../services/store.service';
 import { PrayerService } from '../services/prayer.service';
 import { CommonModule } from '@angular/common';
@@ -6,8 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { GardenComponent } from './garden.component';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '../pipes/translate.pipe';
-
-declare var d3: any;
+import * as d3 from 'd3';
 
 type ChartType = 'bar' | 'radial' | 'trend' | 'heatmap' | 'radar';
 
@@ -23,71 +22,76 @@ export class DashboardComponent implements OnDestroy {
 
   @ViewChild('chartContainer') chartContainer!: ElementRef;
 
-  // Plan Adjustment State
+  // UI State
   isPlanModalOpen = signal(false);
   tempCapacity = signal(1);
   tempTargetDate = signal('');
-
-  // Manual Edit State
   isEditModalOpen = signal(false);
-
-  // Location Search State
   isSearchModalOpen = signal(false);
   searchQuery = signal('');
   searchResults = signal<any[]>([]);
   isSearching = signal(false);
-  
-  // Chart State
   chartMode = signal<ChartType>('bar');
-  
-  // Habit Stacking Logic
   habitTrigger = signal('fard_dhuhr');
-  habitAction = signal('set_1');
+  habitAction = signal('1_set');
 
   // Helper for templates
   prayerTypes: (keyof PrayerCounts)[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'witr'];
 
-  constructor() {
-    // Re-draw chart when data changes or mode changes
-    effect(() => {
-      const missed = this.store.missedPrayers();
-      const completed = this.store.completedPrayers();
-      const history = this.store.history();
-      const khushu = this.store.khushuStats();
-      const mode = this.chartMode();
-      
-      // Delay slightly to ensure container has rendered dimensions
-      setTimeout(() => {
-         if (this.chartContainer) {
-            this.renderChart(mode, missed, completed, history, khushu);
-         }
-      }, 50);
-    });
+  // Summiert alle erledigten Gebete aus der History (aus Supabase View)
+  totalCompleted = computed(() => {
+    return this.store.totalCompletedAbsolute();
+  });
 
-    // Initialize temp capacity when modal opens
+  // Schätzung des Enddatums
+  estimatedCompletionDate = computed(() => {
+    const missed = this.store.totalMissed();
+    const dailyCap = this.store.settings().dailyCapacity || 1;
+    
+    if (missed <= 0) return 'InshaAllah soon';
+    
+    // Annahme: 6 Gebete pro "Set"
+    // TODO: 6 für hanefi und 5 für rest der Madhabs anpassen
+    const totalPrayersPerDay = dailyCap * 6; 
+    const daysLeft = Math.ceil(missed / totalPrayersPerDay);
+    
+    const date = new Date();
+    date.setDate(date.getDate() + daysLeft);
+    return date.toLocaleDateString();
+  });
+
+  progressPercentage = computed(() => {
+    const missed = this.store.totalMissed();
+    const completed = this.totalCompleted();
+    const total = missed + completed;
+    if (total === 0) return 0;
+    return Math.min(100, Math.round((completed / total) * 100));
+  });
+
+  constructor() {
+    // Reagiere auf Datenänderungen und zeichne den Graphen neu
     effect(() => {
-        if(this.isPlanModalOpen()) {
-            this.tempCapacity.set(this.store.userSettings().dailyCapacity);
-            this.tempTargetDate.set(''); 
-        }
+      const missed = this.store.prayerCounts();
+      const completed = this.store.completedCounts();
+      const history = this.store.history();
+      const khushu_ratings = this.store.khushuStats();
+      const mode = this.chartMode();
+
+      // Nur zeichnen, wenn Daten da sind und wir im Browser sind
+      if (missed && completed && history && khushu_ratings && typeof window !== 'undefined') {
+        setTimeout(() => this.renderChart(mode, missed, completed, history, khushu_ratings), 100);
+      }
     });
   }
 
   ngOnDestroy() {
-    // Cleanup any lingering tooltips when leaving the component
     d3.selectAll('.d3-chart-tooltip').remove();
   }
 
-  // Listen for window resize to redraw charts responsively
   @HostListener('window:resize')
   onResize() {
-    this.renderChart(
-        this.chartMode(), 
-        this.store.missedPrayers(), 
-        this.store.completedPrayers(),
-        this.store.history(),
-        this.store.khushuStats()
-    );
+    // Debounce resize events
+    setTimeout(() => this.renderChart(this.chartMode(), this.store.prayerCounts(), this.store.completedCounts(), this.store.history(), this.store.khushuStats()), 200);
   }
 
   refreshLocation() {
@@ -131,39 +135,108 @@ export class DashboardComponent implements OnDestroy {
     this.closeSearchModal();
   }
 
-  renderChart(mode: ChartType, missed: any, completed: any, history: any, khushu: any) {
-    if (mode === 'bar') this.drawBarChart(missed, completed);
-    else if (mode === 'radial') this.drawRadialChart(missed, completed);
-    else if (mode === 'trend') this.drawTrendChart(history);
-    else if (mode === 'heatmap') this.drawHeatmap(history);
-    else if (mode === 'radar') this.drawRadarChart(khushu);
-  }
 
   // --- Modal Logic ---
-  openPlanModal() { this.isPlanModalOpen.set(true); }
+
+  openPlanModal() {
+    // Aktuelle Capacity laden
+    const currentCap = this.store.settings().dailyCapacity || 1;
+    this.tempCapacity.set(currentCap);
+
+    // Dazu passendes Datum berechnen (Initialisierung)
+    this.recalcDateFromCapacity(currentCap);
+    
+    this.isPlanModalOpen.set(true);
+  }
+
+  /**
+   * Szenario A: User ändert Kapazität (+/- Buttons)
+   * -> Wir berechnen das neue Enddatum
+   */
+  updateCapacity(newVal: number) {
+    if (newVal < 1) return;
+    this.tempCapacity.set(newVal);
+    this.recalcDateFromCapacity(newVal);
+  }
+
+  /**
+   * Szenario B: User ändert Datum (Date Picker)
+   * -> Wir berechnen die nötige Kapazität
+   */
+  updateTargetDate(dateStr: string) {
+    this.tempTargetDate.set(dateStr);
+    
+    if (!dateStr) return;
+
+    const targetDate = new Date(dateStr);
+    const today = new Date();
+    
+    // Differenz in Tagen berechnen
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 0) {
+      // Wenn Datum in Vergangenheit/Heute -> Extrem hohe Capacity nötig
+      // Wir setzen es einfach auf Maximum oder lassen es, um Fehler zu vermeiden
+      return; 
+    }
+
+    const totalPrayers = this.store.totalMissed();
+    
+    // Formel: (Gesamt / Tage) / 6 Gebete pro Set
+    // Beispiel: 3000 Gebete in 100 Tagen = 30 Gebete/Tag = 5 Sets/Tag
+    const neededDailyPrayers = totalPrayers / diffDays;
+    const neededSets = Math.ceil(neededDailyPrayers / 6);
+
+    this.tempCapacity.set(Math.max(1, neededSets));
+  }
+
+  /**
+   * Hilfsfunktion: Berechnet Datum basierend auf Capacity
+   */
+  private recalcDateFromCapacity(cap: number) {
+    const totalMissed = this.store.totalMissed();
+    if (totalMissed <= 0) return;
+
+    // Tage = (Gebete / (Sets * 6))
+    const daysNeeded = Math.ceil(totalMissed / (cap * 6));
+    
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + daysNeeded);
+    
+    // Format YYYY-MM-DD für HTML Input
+    this.tempTargetDate.set(targetDate.toISOString().split('T')[0]);
+  }
+
   closePlanModal() { this.isPlanModalOpen.set(false); }
   
   openEditModal() { this.isEditModalOpen.set(true); }
   closeEditModal() { this.isEditModalOpen.set(false); }
 
-  savePlanAdjustment() {
-    this.store.updateDailyCapacity(this.tempCapacity());
-    this.closePlanModal();
+  savePlan() {
+    this.store.updateSettings({ dailyCapacity: this.tempCapacity() });
+    this.isPlanModalOpen.set(false);
   }
 
-  adjustPrayerCount(type: keyof PrayerCounts, amount: number) {
-    this.store.adjustMissedPrayer(type, amount);
+  // Ruft den Store auf, um +1 / -1 zu zählen
+  adjustPrayer(type: string, amount: number, rating?: number) {
+    this.store.updatePrayerCount(type as keyof PrayerCounts, amount, rating);
   }
 
   // Habit Stacking
   saveHabitRule() {
-    this.store.updateHabitRule(this.habitTrigger(), this.habitAction());
+    this.store.updateSettings({
+      habitStackingRule: {
+        trigger: this.habitTrigger(),
+        action: this.habitAction(),
+        active: true
+      }
+    });
   }
 
-  // Helper to access signal data safely in template
-  getMissedCount(type: string): number {
-    const counts = this.store.missedPrayers();
-    return (counts as any)[type] || 0;
+  // Helper für das Template
+  getCount(type: string): number {
+    return (this.store.prayerCounts() as any)[type] || 0;
   }
 
   // --- Chart Logic ---
@@ -194,14 +267,22 @@ export class DashboardComponent implements OnDestroy {
 
   // --- D3 Renderers ---
 
-  resetChart(el: any) {
-    // Only remove SVG elements created by D3, try to preserve other content if possible
-    d3.select(el).selectAll('svg').remove();
-    d3.select(el).style('height', null);
-    d3.selectAll('.d3-chart-tooltip').remove();
+  renderChart(mode: ChartType, missed: any, completed: any, history: any, khushu: any) {
+
+    const el = this.chartContainer.nativeElement;
+    if (el.offsetWidth === 0) return;
+    
+    switch (this.chartMode()) {
+      case 'bar': this.renderBarChart(missed, completed); break;
+      case 'radar': this.renderRadarChart(khushu); break;
+      case 'heatmap': this.renderHeatmap(history); break;
+      case 'trend': this.renderTrendChart(history); break;
+      case 'radial': this.renderRadialProgressChart(missed, completed); break;
+      default: this.renderBarChart(missed, completed);
+    }
   }
 
-  drawBarChart(missed: any, completed: any) {
+  renderBarChart(missed: any, completed: any) {
     const el = this.chartContainer.nativeElement;
     this.resetChart(el);
 
@@ -247,84 +328,75 @@ export class DashboardComponent implements OnDestroy {
         .attr('y', (d: any) => y(d.value))
         .attr('width', xSubgroup.bandwidth())
         .attr('height', (d: any) => height - y(d.value))
-        .attr('fill', (d: any) => color(d.key))
+        .attr('fill', (d: any) => color(d.key) as string)
         .attr('rx', 4);
   }
 
-  drawRadialChart(missed: any, completed: any) {
+  renderHeatmap(history: {[date: string]: number}) {
     const el = this.chartContainer.nativeElement;
     this.resetChart(el);
 
-    const groups = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha', 'Witr'];
-    const containerWidth = el.clientWidth || 600;
+    const containerWidth = (el.clientWidth || 600) - 5;
+    
+    const cellSize = Math.floor((containerWidth - 40) / 15); // approx 15 cols
+    const daysToShow = 70; // 10 weeks
+    
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - daysToShow);
+    
+    // Generate date range
+    const dates = [];
+    for(let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        dates.push(new Date(d));
+    }
 
-    // Dynamic columns based on width
-    let cols = 3;
-    if (containerWidth > 1000) cols = 6;
-    else if (containerWidth < 600) cols = 2;
-    else cols = 3;
-
-    const rows = Math.ceil(groups.length / cols);
-    
-    // Calculate size
-    const availableWidthPerCol = containerWidth / cols;
-    // Cap max radius size for aesthetics
-    const cellSize = Math.min(250, availableWidthPerCol);
-    
-    // Explicit heights for chart and labels
-    const radius = (cellSize / 2) * 0.65; 
-    const labelHeight = 50; 
-    const rowHeight = (radius * 2) + labelHeight + 20; // + Padding
-    
-    const totalHeight = rows * rowHeight; 
-    
-    d3.select(el).style('height', `${totalHeight}px`);
+    const height = 8 * cellSize + 20; // 7 days + padding
+    d3.select(el).style('height', `${height}px`);
 
     const svg = d3.select(el)
-      .append('svg')
-      .attr('width', containerWidth)
-      .attr('height', totalHeight);
+      .append("svg")
+      .attr("width", containerWidth)
+      .attr("height", height)
+      .append("g")
+      .attr("transform", `translate(20, 20)`);
 
-    const data = groups.map(name => {
-      const m = (missed as any)[name.toLowerCase()] || 0;
-      const c = (completed as any)[name.toLowerCase()] || 0;
-      const total = m + c;
-      const percent = total === 0 ? 0 : (c / total);
-      return { name, percent, total, completed: c };
-    });
+    // Helper to get formatted key
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
 
-    const arc = d3.arc().innerRadius(radius * 0.75).outerRadius(radius).startAngle(0);
-    const bgArc = d3.arc().innerRadius(radius * 0.75).outerRadius(radius).startAngle(0).endAngle(2 * Math.PI);
+    // Tooltip - ADD CLASS 'd3-chart-tooltip' to identify and remove it later
+    const tooltip = d3.select('body').append('div')
+        .attr('class', 'd3-chart-tooltip absolute bg-slate-800 text-white text-xs rounded p-2 opacity-0 pointer-events-none transition-opacity z-50 shadow-lg');
 
-    const g = svg.selectAll('.gauge')
-      .data(data).enter().append('g')
-      .attr('transform', (d: any, i: number) => {
-        const row = Math.floor(i / cols);
-        const col = i % cols;
-        // Center within the grid cell
-        const xPos = (col * availableWidthPerCol) + (availableWidthPerCol / 2);
-        const yPos = (row * rowHeight) + (rowHeight / 2) - 10;
-        return `translate(${xPos}, ${yPos})`;
+    // Draw Cells
+    svg.selectAll("rect")
+      .data(dates)
+      .enter().append("rect")
+      .attr("width", cellSize - 4)
+      .attr("height", cellSize - 4)
+      .attr("rx", 3)
+      .attr("x", (d: Date, i: number) => Math.floor(i / 7) * cellSize)
+      .attr("y", (d: Date) => d.getDay() * cellSize)
+      .attr("fill", (d: Date) => {
+          const val = history[fmt(d)] || 0;
+          if (val === 0) return '#f1f5f9'; // slate-100
+          if (val <= 2) return '#a7f3d0'; // emerald-200
+          if (val <= 5) return '#34d399'; // emerald-400
+          return '#059669'; // emerald-600
+      })
+      .on("mouseover", (event: any, d: Date) => {
+          const val = history[fmt(d)] || 0;
+          tooltip.transition().duration(200).style('opacity', 1);
+          tooltip.html(`<strong>${d.toLocaleDateString()}</strong><br/>${val} Prayers`)
+                 .style('left', (event.pageX + 10) + 'px')
+                 .style('top', (event.pageY - 28) + 'px');
+      })
+      .on("mouseout", () => {
+          tooltip.transition().duration(500).style('opacity', 0);
       });
-
-    // Background Arc
-    g.append('path').attr('d', bgArc).attr('fill', '#f1f5f9'); 
-
-    // Progress Arc
-    g.append('path')
-      .attr('fill', (d: any) => d.percent === 1 ? '#10b981' : d.percent > 0.5 ? '#3b82f6' : '#f59e0b')
-      .attr('d', (d: any) => arc({ endAngle: d.percent * 2 * Math.PI } as any))
-      .attr('stroke', 'white').attr('stroke-width', '1px');
-
-    // Labels
-    g.append('text').attr('text-anchor', 'middle').attr('y', -5).attr('class', 'font-bold fill-slate-700').style('font-size', '14px').text((d: any) => d.name);
-    g.append('text').attr('text-anchor', 'middle').attr('y', 15).attr('class', 'fill-slate-400').style('font-size', '12px').text((d: any) => `${Math.round(d.percent * 100)}%`);
-    
-    // Bottom Stats
-    g.append('text').attr('text-anchor', 'middle').attr('y', radius + 25).attr('class', 'fill-slate-400 font-mono').style('font-size', '11px').text((d: any) => `${d.completed} / ${d.total}`);
   }
 
-  drawTrendChart(history: {[date: string]: number}) {
+  renderTrendChart(history: {[date: string]: number}) {
     const el = this.chartContainer.nativeElement;
     this.resetChart(el);
 
@@ -386,7 +458,7 @@ export class DashboardComponent implements OnDestroy {
     svg.append("path")
         .datum(data)
         .attr("fill", "url(#trendGradient)")
-        .attr("d", area);
+        .attr("d", area as any);
 
     // Draw Line
     svg.append("path")
@@ -394,7 +466,7 @@ export class DashboardComponent implements OnDestroy {
         .attr("fill", "none")
         .attr("stroke", "#10b981")
         .attr("stroke-width", 3)
-        .attr("d", d3.line()
+        .attr("d", d3.line<{date: Date; value: number}>()
             .x((d: any) => x(d.date))
             .y((d: any) => y(d.value))
             .curve(d3.curveMonotoneX)
@@ -424,73 +496,87 @@ export class DashboardComponent implements OnDestroy {
         .select(".domain").remove();
   }
 
-  drawHeatmap(history: {[date: string]: number}) {
+  renderRadialProgressChart(missed: any, completed: any) {
     const el = this.chartContainer.nativeElement;
     this.resetChart(el);
 
-    const containerWidth = (el.clientWidth || 600) - 5;
-    
-    // We want squares. Size depends on container.
-    // Display last 60 days approx? Or last 10 weeks.
-    const cellSize = Math.floor((containerWidth - 40) / 15); // approx 15 cols
-    const daysToShow = 70; // 10 weeks
-    
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - daysToShow);
-    
-    // Generate date range
-    const dates = [];
-    for(let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-        dates.push(new Date(d));
-    }
+    const groups = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha', 'Witr'];
+    const containerWidth = el.clientWidth || 600;
 
-    const height = 8 * cellSize + 20; // 7 days + padding
-    d3.select(el).style('height', `${height}px`);
+    // Dynamic columns based on width
+    let cols = 3;
+    if (containerWidth > 1000) cols = 6;
+    else if (containerWidth < 600) cols = 2;
+    else cols = 3;
+
+    const rows = Math.ceil(groups.length / cols);
+    
+    // Calculate size
+    const availableWidthPerCol = containerWidth / cols;
+    // Cap max radius size for aesthetics
+    const cellSize = Math.min(250, availableWidthPerCol);
+    
+    // Explicit heights for chart and labels
+    const radius = (cellSize / 2) * 0.65; 
+    const labelHeight = 50; 
+    const rowHeight = (radius * 2) + labelHeight + 20; // + Padding
+    
+    const totalHeight = rows * rowHeight; 
+    
+    d3.select(el).style('height', `${totalHeight}px`);
 
     const svg = d3.select(el)
-      .append("svg")
-      .attr("width", containerWidth)
-      .attr("height", height)
-      .append("g")
-      .attr("transform", `translate(20, 20)`);
+      .append('svg')
+      .attr('width', containerWidth)
+      .attr('height', totalHeight);
 
-    // Helper to get formatted key
-    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const data = groups.map(name => {
+      const m = (missed as any)[name.toLowerCase()] || 0;
+      const c = (completed as any)[name.toLowerCase()] || 0;
+      const total = m + c;
+      const percent = total === 0 ? 0 : (c / total);
+      return { name, percent, total, completed: c };
+    });
 
-    // Tooltip - ADD CLASS 'd3-chart-tooltip' to identify and remove it later
-    const tooltip = d3.select('body').append('div')
-        .attr('class', 'd3-chart-tooltip absolute bg-slate-800 text-white text-xs rounded p-2 opacity-0 pointer-events-none transition-opacity z-50 shadow-lg');
+    const arc = d3.arc().innerRadius(radius * 0.75).outerRadius(radius).startAngle(0);
+    const bgArc = d3.arc().innerRadius(radius * 0.75).outerRadius(radius).startAngle(0).endAngle(2 * Math.PI);
 
-    // Draw Cells
-    svg.selectAll("rect")
-      .data(dates)
-      .enter().append("rect")
-      .attr("width", cellSize - 4)
-      .attr("height", cellSize - 4)
-      .attr("rx", 3)
-      .attr("x", (d: Date, i: number) => Math.floor(i / 7) * cellSize)
-      .attr("y", (d: Date) => d.getDay() * cellSize)
-      .attr("fill", (d: Date) => {
-          const val = history[fmt(d)] || 0;
-          if (val === 0) return '#f1f5f9'; // slate-100
-          if (val <= 2) return '#a7f3d0'; // emerald-200
-          if (val <= 5) return '#34d399'; // emerald-400
-          return '#059669'; // emerald-600
-      })
-      .on("mouseover", (event: any, d: Date) => {
-          const val = history[fmt(d)] || 0;
-          tooltip.transition().duration(200).style('opacity', 1);
-          tooltip.html(`<strong>${d.toLocaleDateString()}</strong><br/>${val} Prayers`)
-                 .style('left', (event.pageX + 10) + 'px')
-                 .style('top', (event.pageY - 28) + 'px');
-      })
-      .on("mouseout", () => {
-          tooltip.transition().duration(500).style('opacity', 0);
+    const g = svg.selectAll('.gauge')
+      .data(data).enter().append('g')
+      .attr('transform', (d: any, i: number) => {
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        // Center within the grid cell
+        const xPos = (col * availableWidthPerCol) + (availableWidthPerCol / 2);
+        const yPos = (row * rowHeight) + (rowHeight / 2) - 10;
+        return `translate(${xPos}, ${yPos})`;
       });
+
+    // Background Arc
+    g.append('path').attr('d', bgArc as any).attr('fill', '#f1f5f9'); 
+
+    // Progress Arc
+    g.append('path')
+      .attr('fill', (d: any) => d.percent === 1 ? '#10b981' : d.percent > 0.5 ? '#3b82f6' : '#f59e0b')
+      .attr('d', (d: any) => arc({ endAngle: d.percent * 2 * Math.PI } as any))
+      .attr('stroke', 'white').attr('stroke-width', '1px');
+
+    // Labels
+    g.append('text').attr('text-anchor', 'middle').attr('y', -5).attr('class', 'font-bold fill-slate-700').style('font-size', '14px').text((d: any) => d.name);
+    g.append('text').attr('text-anchor', 'middle').attr('y', 15).attr('class', 'fill-slate-400').style('font-size', '12px').text((d: any) => `${Math.round(d.percent * 100)}%`);
+    
+    // Bottom Stats
+    g.append('text').attr('text-anchor', 'middle').attr('y', radius + 25).attr('class', 'fill-slate-400 font-mono').style('font-size', '11px').text((d: any) => `${d.completed} / ${d.total}`);
   }
 
-  drawRadarChart(khushu: any) {
+  resetChart(el: any) {
+    // Only remove SVG elements created by D3, try to preserve other content if possible
+    d3.select(el).selectAll('svg').remove();
+    d3.select(el).style('height', null);
+    d3.selectAll('.d3-chart-tooltip').remove();
+  }
+
+  renderRadarChart(khushu: any) {
     const el = this.chartContainer.nativeElement;
     this.resetChart(el);
 
@@ -576,7 +662,7 @@ export class DashboardComponent implements OnDestroy {
     if (d3.sum(data, (d: any) => d.value) > 0) {
         svg.append("path")
            .attr("class", "radarArea")
-           .attr("d", radarLine(data))
+           .attr("d", radarLine(data as any))
            .style("fill", "#10b981")
            .style("fill-opacity", 0.3)
            .style("stroke", "#059669")
@@ -600,4 +686,119 @@ export class DashboardComponent implements OnDestroy {
            .attr("fill", "#94a3b8");
     }
   }
+
+  drawBarChart(missed: any, completed: any) {
+    const el = this.chartContainer.nativeElement;
+    this.resetChart(el);
+
+    const groups = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha', 'Witr'];
+    const subgroups = ['completed', 'remaining'];
+
+    const data = groups.map(name => ({
+      group: name,
+      completed: (completed as any)[name.toLowerCase()] || 0,
+      remaining: (missed as any)[name.toLowerCase()] || 0
+    }));
+
+    const containerHeight = el.getBoundingClientRect().height || 400; 
+    // Fix: Robust Width Calculation
+    const containerWidth = el.clientWidth || 600;
+    const margin = { top: 20, right: 20, bottom: 30, left: 40 }; 
+    const width = containerWidth - margin.left - margin.right;
+    const height = containerHeight - margin.top - margin.bottom;
+
+    const svg = d3.select(el)
+      .append('svg')
+      .attr('width', width + margin.left + margin.right)
+      .attr('height', height + margin.top + margin.bottom)
+      .append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleBand().domain(groups).range([0, width]).padding(0.2);
+    const y = d3.scaleLinear()
+      .domain([0, (d3.max(data, (d: any) => Math.max(d.completed, d.remaining)) || 10) * 1.1])
+      .range([height, 0]);
+
+    svg.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x).tickSize(0)).attr('class', 'text-slate-500 font-medium').select('.domain').remove();
+    svg.append('g').call(d3.axisLeft(y).ticks(5)).attr('class', 'text-slate-400').select('.domain').remove();
+
+    const xSubgroup = d3.scaleBand().domain(subgroups).range([0, x.bandwidth()]).padding(0.05);
+    const color = d3.scaleOrdinal().domain(subgroups).range(['#10b981', '#f87171']);
+
+    svg.append('g').selectAll('g').data(data).enter().append('g')
+        .attr('transform', (d: any) => `translate(${x(d.group)},0)`)
+      .selectAll('rect').data((d: any) => subgroups.map(key => ({ key, value: d[key] })))
+      .enter().append('rect')
+        .attr('x', (d: any) => xSubgroup(d.key))
+        .attr('y', (d: any) => y(d.value))
+        .attr('width', xSubgroup.bandwidth())
+        .attr('height', (d: any) => height - y(d.value))
+        .attr('fill', (d: any) => color(d.key) as string)
+        .attr('rx', 4);
+  }
+
+  
+
+  drawHeatmap(history: {[date: string]: number}) {
+    const el = this.chartContainer.nativeElement;
+    this.resetChart(el);
+
+    const containerWidth = (el.clientWidth || 600) - 5;
+    
+    const cellSize = Math.floor((containerWidth - 40) / 15); // approx 15 cols
+    const daysToShow = 70; // 10 weeks
+    
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - daysToShow);
+    
+    // Generate date range
+    const dates = [];
+    for(let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        dates.push(new Date(d));
+    }
+
+    const height = 8 * cellSize + 20; // 7 days + padding
+    d3.select(el).style('height', `${height}px`);
+
+    const svg = d3.select(el)
+      .append("svg")
+      .attr("width", containerWidth)
+      .attr("height", height)
+      .append("g")
+      .attr("transform", `translate(20, 20)`);
+
+    // Helper to get formatted key
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const tooltip = d3.select('body').append('div')
+        .attr('class', 'd3-chart-tooltip absolute bg-slate-800 text-white text-xs rounded p-2 opacity-0 pointer-events-none transition-opacity z-50 shadow-lg');
+
+    // Draw Cells
+    svg.selectAll("rect")
+      .data(dates)
+      .enter().append("rect")
+      .attr("width", cellSize - 4)
+      .attr("height", cellSize - 4)
+      .attr("rx", 3)
+      .attr("x", (d: Date, i: number) => Math.floor(i / 7) * cellSize)
+      .attr("y", (d: Date) => d.getDay() * cellSize)
+      .attr("fill", (d: Date) => {
+          const val = history[fmt(d)] || 0;
+          if (val === 0) return '#f1f5f9'; // slate-100
+          if (val <= 2) return '#a7f3d0'; // emerald-200
+          if (val <= 5) return '#34d399'; // emerald-400
+          return '#059669'; // emerald-600
+      })
+      .on("mouseover", (event: any, d: Date) => {
+          const val = history[fmt(d)] || 0;
+          tooltip.transition().duration(200).style('opacity', 1);
+          tooltip.html(`<strong>${d.toLocaleDateString()}</strong><br/>${val} Prayers`)
+                 .style('left', (event.pageX + 10) + 'px')
+                 .style('top', (event.pageY - 28) + 'px');
+      })
+      .on("mouseout", () => {
+          tooltip.transition().duration(500).style('opacity', 0);
+      });
+  }
+
 }
