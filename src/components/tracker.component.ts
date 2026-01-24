@@ -27,8 +27,6 @@ export class TrackerComponent {
 
   toggleFard(key: string) {
     this.todayFardState[key] = !this.todayFardState[key];
-    // Optional: Fard Tracking in DB implementieren (aktuell nur UI)
-    console.log('Fard toggled:', key);
   }
 
   initiateQada(key: string) {
@@ -39,14 +37,12 @@ export class TrackerComponent {
     this.activeKhushuInput.set(null);
   }
 
-  // Fix: logPrayer -> updatePrayerCount
   // Wichtig: change = -1 bedeutet "1 Gebet nachgeholt" (Schuld verringern)
   confirmQada(key: string, rating: number) {
     this.store.updatePrayerCount(key as keyof PrayerCounts, -1, rating);
     this.activeKhushuInput.set(null);
   }
 
-  // Fix: Helper um den aktuellen Stand abzufragen
   getMissedCount(key: string): number {
     return (this.store.prayerCounts() as any)[key] || 0;
   }
