@@ -1,4 +1,4 @@
-import { Component, inject, signal, effect } from '@angular/core';
+import { Component, inject, signal, effect, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
@@ -26,6 +26,21 @@ export class ProfileComponent {
   // Feedback
   errorMessage = signal<string | null>(null);
   successMessage = signal<string | null>(null);
+
+  // Computed Values für Overview ---
+  currentPlanLabel = computed(() => {
+    const cap = this.store.settings().dailyCapacity || 1;
+    return cap;
+  });
+
+  progressPercentage = computed(() => {
+    const missed = this.store.totalMissed(); // Offene Gebete
+    const completed = this.store.totalCompletedAbsolute(); // Erledigte Gebete
+    const total = missed + completed;
+    
+    if (total === 0) return 0;
+    return Math.round((completed / total) * 100);
+  });
 
   // --- Settings Forms ---
   profileUpdateForm = this.fb.group({
