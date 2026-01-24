@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "ng serve",
-    "build": "node set-env.js && ng build",
+    "build": "node set-env.cjs && ng build",
     "preview": "ng serve --configuration=production"
   },
   "dependencies": {
