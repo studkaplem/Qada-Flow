@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { StoreService } from '../services/store.service';
+import { StoreService, PrayerCounts } from '../services/store.service';
 import { CommonModule } from '@angular/common';
 import { TranslatePipe } from '../pipes/translate.pipe';
 
@@ -12,10 +12,8 @@ import { TranslatePipe } from '../pipes/translate.pipe';
 export class TrackerComponent {
   store = inject(StoreService);
 
-  // Tracks which prayer card is currently asking for rating
   activeKhushuInput = signal<string | null>(null);
 
-  // Helper for consistent ordering
   prayers = [
     { key: 'fajr', label: 'Fajr' },
     { key: 'dhuhr', label: 'Dhuhr' },
@@ -29,10 +27,10 @@ export class TrackerComponent {
 
   toggleFard(key: string) {
     this.todayFardState[key] = !this.todayFardState[key];
-    this.store.logPrayer(key as any, false);
+    // Optional: Fard Tracking in DB implementieren (aktuell nur UI)
+    console.log('Fard toggled:', key);
   }
 
-  // Opens the rating menu for a specific prayer
   initiateQada(key: string) {
     this.activeKhushuInput.set(key);
   }
@@ -41,13 +39,15 @@ export class TrackerComponent {
     this.activeKhushuInput.set(null);
   }
 
-  // Logs the prayer with specific focus level
+  // Fix: logPrayer -> updatePrayerCount
+  // Wichtig: change = -1 bedeutet "1 Gebet nachgeholt" (Schuld verringern)
   confirmQada(key: string, rating: number) {
-    this.store.logPrayer(key as any, true, rating);
-    this.activeKhushuInput.set(null); // Close menu
+    this.store.updatePrayerCount(key as keyof PrayerCounts, -1, rating);
+    this.activeKhushuInput.set(null);
   }
 
+  // Fix: Helper um den aktuellen Stand abzufragen
   getMissedCount(key: string): number {
-    return (this.store.missedPrayers() as any)[key];
+    return (this.store.prayerCounts() as any)[key] || 0;
   }
 }
