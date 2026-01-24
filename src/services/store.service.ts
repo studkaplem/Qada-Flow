@@ -1,226 +1,256 @@
-import { Injectable, signal, computed, effect } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { SupabaseClient, createClient } from '@supabase/supabase-js';
+import { environment } from '../environments/environment';
+import { AuthService } from './auth.service';
+
+// --- Domain Models (Erweitert wie gewünscht) ---
 
 export interface PrayerCounts {
-  fajr: number;
-  dhuhr: number;
-  asr: number;
-  maghrib: number;
-  isha: number;
-  witr: number;
+  fajr: number; dhuhr: number; asr: number; maghrib: number; isha: number; witr: number;
 }
 
 export interface HabitRule {
-  trigger: string; // e.g., 'fard_dhuhr'
-  action: string;  // e.g., '1_set'
+  trigger: string; 
+  action: string;
   active: boolean;
 }
-
+// erkläre mir UserSettings
+// 
 export interface UserSettings {
-  startDate: string | null;
-  endDate: string | null;
+  calculationMethod: string;
+  startDate: string;
+  dailyCapacity: number;
   isFemale: boolean;
   menstruationDays: number;
-  dailyCapacity: number; // How many extra Qada prayers per day
-  calculationMethod: string;
-  habitStackingRule: HabitRule | null; // NEW: The atomic habit contract
+  habitStackingRule: HabitRule | null;
+  madhab: 'hanafi' | 'shafi'; // TODO: change this later
 }
 
-// Map "YYYY-MM-DD" to total count of Qada prayers performed that day
 export interface HistoryLog {
   [date: string]: number; 
 }
 
-// Track aggregate quality scores
 export interface KhushuStats {
   [key: string]: { totalScore: number; count: number }; 
 }
 
-const INITIAL_COUNTS: PrayerCounts = {
-  fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0, witr: 0
-};
-
-const INITIAL_KHUSHU: KhushuStats = {
-  fajr: { totalScore: 0, count: 0 },
-  dhuhr: { totalScore: 0, count: 0 },
-  asr: { totalScore: 0, count: 0 },
-  maghrib: { totalScore: 0, count: 0 },
-  isha: { totalScore: 0, count: 0 },
-  witr: { totalScore: 0, count: 0 }
+// Defaults
+const DEFAULT_COUNTS: PrayerCounts = { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0, witr: 0 };
+const DEFAULT_SETTINGS: UserSettings = {
+  calculationMethod: 'MWL',
+  startDate: new Date().toISOString(),
+  dailyCapacity: 1,
+  isFemale: false,
+  menstruationDays: 7,
+  habitStackingRule: null,
+  madhab: 'hanafi'
 };
 
 @Injectable({
   providedIn: 'root'
 })
 export class StoreService {
-  // State Signals
-  readonly userSettings = signal<UserSettings>({
-    startDate: null,
-    endDate: null,
-    isFemale: false,
-    menstruationDays: 7,
-    dailyCapacity: 1,
-    calculationMethod: 'MWL',
-    habitStackingRule: null
-  });
+  private supabase: SupabaseClient;
+  private auth = inject(AuthService);
 
-  readonly missedPrayers = signal<PrayerCounts>({ ...INITIAL_COUNTS });
-  readonly completedPrayers = signal<PrayerCounts>({ ...INITIAL_COUNTS });
-  readonly history = signal<HistoryLog>({});
+  // --- STATE (Signals) ---
+  readonly prayerCounts = signal<PrayerCounts>(DEFAULT_COUNTS); // Schulden
+  readonly completedCounts = signal<PrayerCounts>(DEFAULT_COUNTS); // Erledigte Gebete
+  readonly settings = signal<UserSettings>(DEFAULT_SETTINGS);
   
-  // NEW: Khushu Stats
-  readonly khushuStats = signal<KhushuStats>({ ...INITIAL_KHUSHU });
+  // Diese waren im alten Service im localStorage, jetzt kommen sie aus der DB View
+  readonly history = signal<HistoryLog>({});
+  readonly khushuStats = signal<KhushuStats>({});
+  
+  readonly isLoading = signal<boolean>(false);
 
-  // Computed Signals
+  // Computed
   readonly totalMissed = computed(() => {
-    const counts = this.missedPrayers();
-    return counts.fajr + counts.dhuhr + counts.asr + counts.maghrib + counts.isha + counts.witr;
+    const c = this.prayerCounts();
+    return c.fajr + c.dhuhr + c.asr + c.maghrib + c.isha + c.witr;
   });
 
-  readonly totalCompleted = computed(() => {
-    const counts = this.completedPrayers();
-    return counts.fajr + counts.dhuhr + counts.asr + counts.maghrib + counts.isha + counts.witr;
+  readonly totalCompletedAbsolute = computed(() => {
+    const c = this.completedCounts();
+    return c.fajr + c.dhuhr + c.asr + c.maghrib + c.isha + c.witr;
   });
 
-  readonly progressPercentage = computed(() => {
-    const total = this.totalMissed() + this.totalCompleted();
-    if (total === 0) return 0;
-    return Math.round((this.totalCompleted() / total) * 100);
-  });
-
-  readonly estimatedCompletionDate = computed(() => {
-    const remaining = this.totalMissed();
-    const prayersPerDay = this.userSettings().dailyCapacity * 6; 
-    
-    if (remaining <= 0 || prayersPerDay <= 0) return 'Completed';
-    
-    const daysNeeded = Math.ceil(remaining / prayersPerDay);
-    const date = new Date();
-    date.setDate(date.getDate() + daysNeeded);
-    return date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric', day: 'numeric' });
-  });
+  // Berechnet, ob der User überhaupt schon gestartet hat (für Dashboard Empty State)
+  readonly hasStarted = computed(() => this.totalMissed() > 0 || Object.keys(this.history()).length > 0);
 
   constructor() {
-    this.loadFromStorage();
-    
-    // Auto-save effect
+    this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
+
     effect(() => {
-      localStorage.setItem('qada_settings', JSON.stringify(this.userSettings()));
-      localStorage.setItem('qada_missed', JSON.stringify(this.missedPrayers()));
-      localStorage.setItem('qada_completed', JSON.stringify(this.completedPrayers()));
-      localStorage.setItem('qada_history', JSON.stringify(this.history()));
-      localStorage.setItem('qada_khushu', JSON.stringify(this.khushuStats()));
-    });
+      const user = this.auth.currentUser();
+      if (user) {
+        this.loadUserData(user.id);
+      } else {
+        this.resetState();
+      }
+    }, { allowSignalWrites: true });
   }
 
-  calculateMissedPrayers(start: string, end: string, isFemale: boolean, periodDays: number) {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    
-    // Difference in time
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-    
-    let totalDays = diffDays;
-
-    if (isFemale) {
-        // Approximate reduction based on monthly cycle
-        const reductionRatio = periodDays / 30;
-        const daysToSubtract = Math.floor(totalDays * reductionRatio);
-        totalDays = totalDays - daysToSubtract;
-    }
-
-    const total = totalDays;
-    
-    this.missedPrayers.set({
-      fajr: total,
-      dhuhr: total,
-      asr: total,
-      maghrib: total,
-      isha: total,
-      witr: total
-    });
-
-    this.userSettings.update(s => ({ ...s, startDate: start, endDate: end, isFemale, menstruationDays: periodDays }));
+  private resetState() {
+    this.prayerCounts.set(DEFAULT_COUNTS);
+    this.settings.set(DEFAULT_SETTINGS);
+    this.history.set({});
+    this.khushuStats.set({});
   }
 
-  updateDailyCapacity(newCapacity: number) {
-    this.userSettings.update(s => ({ ...s, dailyCapacity: newCapacity }));
-  }
-  
-  updateHabitRule(trigger: string, action: string) {
-    this.userSettings.update(s => ({ 
-        ...s, 
-        habitStackingRule: { trigger, action, active: true } 
-    }));
-  }
+  /**
+   * Lädt ALLE relevanten Informationen parallel aus DB und Views
+   */
+  private async loadUserData(userId: string) {
+    this.isLoading.set(true);
+    try {
+      const [resSettings, resCounts, resKhushu, resHistory] = await Promise.all([
+        this.supabase.from('profiles').select('settings').eq('id', userId).single(),
+        this.supabase.from('view_prayer_counts').select('*').eq('user_id', userId),
+        this.supabase.from('view_khushu_stats').select('*').eq('user_id', userId),
+        this.supabase.from('view_daily_history').select('*').eq('user_id', userId)
+      ]);
 
-  adjustMissedPrayer(type: keyof PrayerCounts, amount: number) {
-    // 1. Update Missed Count
-    this.missedPrayers.update(current => {
-      const newVal = current[type] + amount;
-      return { ...current, [type]: Math.max(0, newVal) }; // Prevent negative debt
-    });
+      if (resSettings.data?.settings) this.settings.set({ ...DEFAULT_SETTINGS, ...resSettings.data.settings });
 
-    // 2. Logic Update: If user reduces debt manually (amount < 0), 
-    // we assume they completed them or found they had done them previously.
-    // This ensures the "Garden" and progress bars update accordingly.
-    if (amount < 0) {
-      const completedAmount = Math.abs(amount);
-      this.completedPrayers.update(current => ({ 
-        ...current, 
-        [type]: current[type] + completedAmount 
-      }));
-    }
-  }
-
-  // Updated: Accepts optional khushu rating (1-3)
-  logPrayer(type: keyof PrayerCounts, isQada: boolean, khushuRating?: number) {
-    if (isQada) {
-      // 1. Update Totals
-      this.missedPrayers.update(current => {
-        const val = current[type];
-        return { ...current, [type]: Math.max(0, val - 1) };
-      });
-      this.completedPrayers.update(current => ({ ...current, [type]: current[type] + 1 }));
-
-      // 2. Update History Log
-      const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
-      this.history.update(h => {
-        const currentCount = h[today] || 0;
-        return { ...h, [today]: currentCount + 1 };
-      });
-
-      // 3. Update Khushu Stats (if provided)
-      if (khushuRating) {
-        this.khushuStats.update(k => {
-          const currentStat = k[type] || { totalScore: 0, count: 0 };
-          return {
-            ...k,
-            [type]: {
-              totalScore: currentStat.totalScore + khushuRating,
-              count: currentStat.count + 1
-            }
-          };
+      if (resCounts.data) {
+        const newMissed = { ...DEFAULT_COUNTS };
+        const newCompleted = { ...DEFAULT_COUNTS };
+        
+        resCounts.data.forEach((row: any) => {
+          const type = row.prayer_type;
+          if (Object.keys(newMissed).includes(type)) {
+            (newMissed as any)[type] = Number(row.total_count) || 0;
+            (newCompleted as any)[type] = Number(row.completed_count) || 0; // Das neue Feld aus der SQL View
+          }
         });
+        
+        this.prayerCounts.set(newMissed);
+        this.completedCounts.set(newCompleted);
+      }
+      
+      // History Mapping (Bleibt für den Garden relevant)
+      if (resHistory.data) {
+        const hist: HistoryLog = {};
+        resHistory.data.forEach((row: any) => { hist[row.log_date] = row.prayers_done; });
+        this.history.set(hist);
+      }
+      // Khushu Mapping
+      if (resKhushu.data) {
+        const stats: KhushuStats = {};
+        resKhushu.data.forEach((row: any) => {
+          stats[row.prayer_type] = { totalScore: row.total_score, count: row.rating_count };
+        });
+        this.khushuStats.set(stats);
       }
 
-    } else {
-        // Just tracking daily fard
-        console.log(`Fard ${type} completed`);
+    } catch (err) {
+      console.error('[Store] Load Error', err);
+    } finally {
+      this.isLoading.set(false);
     }
   }
 
-  private loadFromStorage() {
-    const s = localStorage.getItem('qada_settings');
-    const m = localStorage.getItem('qada_missed');
-    const c = localStorage.getItem('qada_completed');
-    const h = localStorage.getItem('qada_history');
-    const k = localStorage.getItem('qada_khushu');
 
-    if (s) this.userSettings.set(JSON.parse(s));
-    if (m) this.missedPrayers.set(JSON.parse(m));
-    if (c) this.completedPrayers.set(JSON.parse(c));
-    if (h) this.history.set(JSON.parse(h));
-    if (k) this.khushuStats.set(JSON.parse(k));
+  /**
+   * Transaktion ausführen (Zählt +1/-1 und aktualisiert Khushu & History)
+   */
+  async updatePrayerCount(type: keyof PrayerCounts, change: number, khushuRating?: number) {
+    const user = this.auth.currentUser();
+    if (!user) return;
+
+    // Optimistic Update Schulden
+    this.prayerCounts.update(c => ({ ...c, [type]: Math.max(0, (c[type] || 0) + change) }));
+    
+    // Optimistic Update Erledigt & History (nur wenn change negativ ist)
+    if (change < 0) {
+        this.completedCounts.update(c => ({ ...c, [type]: (c[type] || 0) + 1 }));
+
+        // History Log für Garden
+        const today = new Date().toISOString().split('T')[0];
+        this.history.update(h => ({ ...h, [today]: (h[today] || 0) + 1 }));
+
+        // Khushu Stats (optional, nur wenn vom Tracker übergeben)
+        if (khushuRating !== undefined && khushuRating !== null) {
+             this.khushuStats.update(k => {
+                const current = k[type] || { totalScore: 0, count: 0 };
+                return { ...k, [type]: { totalScore: current.totalScore + khushuRating, count: current.count + 1 }};
+            });
+        }
+    }
+
+    await this.supabase.from('qada_transactions').insert({
+      user_id: user.id,
+      prayer_type: type,
+      amount: change,
+      khushu_rating: khushuRating || null,
+      is_qada: true
+    });
+  }
+
+  /**
+   * Für den Calculator. Setzt die Schulden initial.
+   * Berechnet die Differenz zum aktuellen Stand und fügt eine Korrektur-Transaktion ein.
+   */
+  async initializePrayerCounts(targetCounts: number) {
+    const user = this.auth.currentUser();
+    if (!user) return;
+    
+    this.isLoading.set(true);
+
+    const current = this.prayerCounts();
+    const updates = [];
+    const types: (keyof PrayerCounts)[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'witr'];
+
+    // Wir berechnen für jeden Gebetstyp das Delta
+    for (const type of types) {
+      const currentVal = current[type] || 0;
+      const delta = targetCounts - currentVal;
+
+      if (delta !== 0) {
+        updates.push({
+          user_id: user.id,
+          prayer_type: type,
+          amount: delta, // Kann positiv (Schuld) oder negativ (Korrektur) sein
+          is_qada: true
+        });
+      }
+    }
+
+    if (updates.length > 0) {
+      const { error } = await this.supabase.from('qada_transactions').insert(updates);
+      // Update Local State sofort
+      const newCounts = { ...DEFAULT_COUNTS };
+      types.forEach(t => (newCounts as any)[t] = targetCounts);
+      this.prayerCounts.set(newCounts);
+    }
+    
+    this.isLoading.set(false);
+  }
+
+  /**
+   * Speichert komplexe Settings (ink. HabitRule & Menstruation)
+   */
+  async updateSettings(newSettings: Partial<UserSettings>) {
+    const user = this.auth.currentUser();
+    if (!user) return;
+
+    // Lokal sofort anzeigen (Optimistic Update)
+    const updatedState = { ...this.settings(), ...newSettings };
+    this.settings.set(updatedState);
+
+    const { data, error } = await this.supabase
+      .from('profiles')
+      .update({ settings: updatedState })
+      .eq('id', user.id)
+      .select();
+
+    if (error) {
+      console.error('[Store] Fehler beim Speichern:', error.message);
+    } else if (data && data.length === 0) {
+      console.warn('[Store] WARNUNG: Einstellungen wurden nicht gespeichert! Profil fehlt in DB.');
+    } else {
+      console.log('[Store] Einstellungen erfolgreich gespeichert:', newSettings);
+    }
   }
 }
