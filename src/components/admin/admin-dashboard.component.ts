@@ -1,7 +1,7 @@
-import { Component, inject, signal, effect } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ContentService, Article } from '../../services/content.service';
+import { ContentService, InspirationPost } from '../../services/content.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
 type Timeframe = '1w' | '1m' | '6m' | '1y';
@@ -30,18 +30,17 @@ export class AdminDashboardComponent {
   chartData: ChartPoint[] = [];
 
   // CMS State
-  editingArticleId = signal<string | null>(null);
+  isEditorOpen = signal(false);
+  editingPostId = signal<number | null>(null);
 
-  // CMS Form
-  articleForm = this.fb.group({
+  postForm = this.fb.group({
     title: ['', Validators.required],
     category: ['islamic', Validators.required],
+    read_time: ['2 min', Validators.required],
     excerpt: ['', Validators.required],
-    content: ['', Validators.required], // Store as one string, split by newline later
-    actionStep: ['', Validators.required],
-    readTime: ['2 min', Validators.required],
-    source: ['Admin', Validators.required],
-    icon: ['fa-star', Validators.required]
+    contentBody: ['', Validators.required],
+    action_step: [''],
+    source: ['']
   });
 
   // Analytics Mock Data Holders
@@ -52,11 +51,8 @@ export class AdminDashboardComponent {
     estCost: '$12.40'
   });
 
-  constructor() {
-    // Regenerate charts whenever timeframe or selected metric changes
-    effect(() => {
-        this.generateMockCharts(this.growthTimeframe(), this.selectedMetric());
-    });
+  ngOnInit() {
+    this.contentService.loadPosts();
   }
 
   selectMetric(metric: MetricType) {
@@ -162,76 +158,76 @@ export class AdminDashboardComponent {
 
   // --- CMS Actions ---
 
-  editArticle(article: Article) {
-      this.editingArticleId.set(article.id);
+  openEditor(post?: InspirationPost) {
+    this.isEditorOpen.set(true);
+    
+    if (post) {
+      this.editingPostId.set(post.id!);
       
-      // Populate form
-      this.articleForm.patchValue({
-          title: article.title || '',
-          category: article.category,
-          excerpt: article.excerpt || '',
-          content: (article.content || []).join('\n'),
-          actionStep: article.actionStep || '',
-          readTime: article.readTime,
-          source: article.source || 'Admin',
-          icon: article.icon
+      // DB Array -> Textarea String (verbunden mit zwei Zeilenumbrüchen)
+      const bodyText = Array.isArray(post.content) 
+        ? post.content.join('\n\n') 
+        : '';
+
+      this.postForm.patchValue({
+        title: post.title,
+        category: post.category,
+        read_time: post.read_time,
+        excerpt: post.excerpt,
+        contentBody: bodyText,
+        action_step: post.action_step,
+        source: post.author || ''
       });
-      
-      // Scroll to form on mobile
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  cancelEdit() {
-      this.editingArticleId.set(null);
-      this.resetForm();
-  }
-
-  deleteArticle(id: string) {
-    if(confirm('Are you sure you want to delete this article?')) {
-        this.contentService.deleteArticle(id);
-        if (this.editingArticleId() === id) {
-            this.cancelEdit();
-        }
+    } else {
+      // Reset für neuen Post
+      this.editingPostId.set(null);
+      this.postForm.reset({
+        category: 'islamic',
+        read_time: '2 min'
+      });
     }
   }
 
-  submitArticle() {
-    if (this.articleForm.valid) {
-      const v = this.articleForm.value;
-      
-      const articleData = {
-        category: v.category as any,
-        icon: v.icon || 'fa-star',
-        readTime: v.readTime || '2 min',
-        title: v.title!,
-        excerpt: v.excerpt!,
-        content: (v.content || '').split('\n').filter(p => p.trim().length > 0),
-        actionStep: v.actionStep!,
-        source: v.source!
-      };
+  closeEditor() {
+    this.isEditorOpen.set(false);
+    this.editingPostId.set(null);
+  }
 
-      if (this.editingArticleId()) {
-          // Update existing
-          this.contentService.updateArticle(this.editingArticleId()!, articleData);
-          alert('Article updated successfully!');
-      } else {
-          // Create new
-          this.contentService.addArticle(articleData);
-          alert('Article published successfully!');
-      }
-
-      this.cancelEdit(); // Resets form and ID
+  async deletePost(id: number) {
+    if (confirm('Diesen Beitrag wirklich löschen?')) {
+      await this.contentService.deletePost(id);
     }
+  }
+
+  async savePost() {
+    if (this.postForm.invalid) return;
+
+    const v = this.postForm.value;
+    
+    // Textarea String -> DB Array (Split bei Leerzeilen)
+    const contentArray = v.contentBody 
+      ? v.contentBody.split('\n\n').map(p => p.trim()).filter(p => p.length > 0)
+      : [];
+
+    const postData: InspirationPost = {
+      title: v.title!,
+      category: v.category as any,
+      read_time: v.read_time!,
+      excerpt: v.excerpt!,
+      content: contentArray,
+      action_step: v.action_step || '',
+      // Icon wird im Service gesetzt
+    };
+
+    if (this.editingPostId()) {
+      await this.contentService.updatePost(this.editingPostId()!, postData);
+    } else {
+      await this.contentService.createPost(postData);
+    }
+
+    this.closeEditor();
   }
   
-  private resetForm() {
-      this.articleForm.reset({
-        category: 'islamic',
-        readTime: '2 min',
-        source: 'Admin',
-        icon: 'fa-star'
-      });
-  }
   
   getGrowthHeight(val: number): string {
       const values = this.chartData.map(p => p.value);
