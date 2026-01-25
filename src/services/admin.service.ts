@@ -20,11 +20,9 @@ export class AdminService {
   stats = signal<AdminStats | null>(null);
   isLoading = signal(false);
 
-  // Updated: Akzeptiert jetzt auch 'metric'
   async loadStats(range: string, metric: string) {
     this.isLoading.set(true);
     
-    // RPC Aufruf mit beiden Parametern
     const { data, error } = await this.supabase
       .rpc('get_admin_dashboard_stats', { 
         time_range: range, 
