@@ -1,10 +1,11 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ContentService, InspirationPost } from '../../services/content.service';
+import { AdminService } from '../../services/admin.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
-type Timeframe = '1w' | '1m' | '6m' | '1y';
+type Timeframe = '1w' | '1m' | '1y';
 type MetricType = 'users' | 'active' | 'db' | 'cost';
 
 interface ChartPoint {
@@ -15,14 +16,18 @@ interface ChartPoint {
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
+  providers: [DatePipe],
   imports: [CommonModule, ReactiveFormsModule, TranslatePipe],
   templateUrl: './admin-dashboard.component.html'
 })
-export class AdminDashboardComponent {
+export class AdminDashboardComponent implements OnInit{
   contentService = inject(ContentService);
+  adminService = inject(AdminService);
   private fb = inject(FormBuilder);
+  private datePipe = inject(DatePipe);
 
   activeTab = signal<'analytics' | 'content'>('analytics');
+  selectedTimeframe = signal<Timeframe>('1w');
   
   // Analytics State
   growthTimeframe = signal<Timeframe>('1m');
@@ -43,20 +48,74 @@ export class AdminDashboardComponent {
     source: ['']
   });
 
-  // Analytics Mock Data Holders
-  stats = signal({
-    totalUsers: 1420,
-    dailyActive: 340,
-    databaseSize: '450 MB',
-    estCost: '$12.40'
+  // Dynamische Berechnung basierend auf Datenbankgröße
+  // TODO: nutzen wenn preismodel sich ändert
+  estimatedCost = computed(() => {
+    const stats = this.adminService.stats();
+    if (!stats) return '$0.00';
+    
+    // Pro Plan $25 + $0.125 pro GB über 8GB
+    const basePrice = 25.00; 
+    const sizeGB = stats.rawDbSize / (1024 * 1024 * 1024);
+    const extraStorage = Math.max(0, sizeGB - 8) * 0.125;
+    
+    return '$' + (basePrice + extraStorage).toFixed(2);
+  });
+
+  chartMax = computed(() => {
+    const data = this.adminService.stats()?.chartData || [];
+    if (data.length === 0) return 10;
+    return Math.max(...data.map(d => d.value)) * 1.2; // +20% Buffer oben
   });
 
   ngOnInit() {
+    this.refreshStats();
+  }
+
+  // Zentraler Refresh
+  refreshStats() {
+    this.adminService.loadStats(
+      this.growthTimeframe(), 
+      this.selectedMetric()
+    );
     this.contentService.loadPosts();
   }
 
   selectMetric(metric: MetricType) {
-      this.selectedMetric.set(metric);
+    this.selectedMetric.set(metric);
+    this.refreshStats();
+  }
+
+  // Titel basierend auf Auswahl
+  getChartTitle(): string {
+    switch(this.selectedMetric()) {
+      case 'users': return 'Wachstum: Neue Benutzer';
+      case 'active': return 'Trend: Aktive Benutzer (Daily)';
+      case 'db': return 'Datenbank Wachstum (geschätzt)';
+      case 'cost': return 'Kosten Entwicklung (geschätzt)';
+      default: return 'Statistik';
+    }
+  }
+
+  // Helper für Chart-Balken Höhe
+  getBarHeight(val: number): string {
+    const data = this.adminService.stats()?.chartData || [];
+    if (!data.length) return '0%';
+    const max = Math.max(...data.map(d => d.value)) || 1;
+    // Mindesthöhe 5%, damit man auch kleine Werte sieht
+    const pct = (val / max) * 100;
+    return `${Math.max(pct, 5)}%`;
+  }
+
+  // Chart Helper: Balkenfarbe basierend auf Metrik
+  getBarColorClass(): string {
+    switch(this.selectedMetric()) {
+      case 'users': return 'bg-blue-500 hover:bg-blue-600';
+      case 'active': return 'bg-emerald-500 hover:bg-emerald-600';
+      case 'db': return 'bg-purple-500 hover:bg-purple-600';
+      case 'cost': return 'bg-amber-500 hover:bg-amber-600';
+      default: return 'bg-slate-500';
+    }
   }
   
   // Helper for tooltip display
@@ -69,83 +128,30 @@ export class AdminDashboardComponent {
       return `${value}`;
   }
 
-  generateMockCharts(timeframe: Timeframe, metric: MetricType) {
-    this.chartData = [];
-    let base = 0;
-    let volatility = 0;
+  /**
+   * Entscheidet, ob ein Label angezeigt wird
+   * - 1w: Immer
+   * - 1m: Jeden 5. Tag
+   * - 1y: Jeden Monat (immer, da nur 12 Balken)
+   */
+  shouldShowLabel(index: number): boolean {
+    const tf = this.growthTimeframe();
+    if (tf === '1w') return true;
+    if (tf === '1y') return true;
+    if (tf === '1m') return index % 5 === 0;
+    return false;
+  }
+
+  formatLabel(dateStr: string): string {
+    const tf = this.growthTimeframe();
     
-    // Set base values depending on metric
-    switch(metric) {
-        case 'users': base = 1000; volatility = 20; break;
-        case 'active': base = 300; volatility = 50; break;
-        case 'db': base = 400; volatility = 5; break; // MB
-        case 'cost': base = 10; volatility = 1; break; // $
+    if (tf === '1y') {
+        return this.datePipe.transform(dateStr, 'MMM yyyy') || dateStr;
+    } 
+    else if (tf === '1w') {
+        return this.datePipe.transform(dateStr, 'EEE') || dateStr;
     }
-
-    // Helpers for labels
-    const getDayName = (offset: number) => {
-        const d = new Date();
-        d.setDate(d.getDate() - offset);
-        return d.toLocaleDateString('en-US', { weekday: 'short' });
-    };
-
-    const getMonthName = (offset: number) => {
-        const d = new Date();
-        d.setMonth(d.getMonth() - offset);
-        return d.toLocaleDateString('en-US', { month: 'short' });
-    };
-
-    const addPoint = (label: string, val: number) => {
-        this.chartData.push({ label, value: Math.max(0, val) });
-    };
-
-    // Generation Logic
-    if (timeframe === '1w') {
-        // Last 7 days
-        for(let i=6; i>=0; i--) {
-            // Simulate trend
-            if (metric === 'users' || metric === 'db') base += Math.random() * 10;
-            if (metric === 'active') base = 300 + (Math.random() * 100 - 50);
-            
-            const noise = (Math.random() * volatility) - (volatility/2);
-            addPoint(getDayName(i), Math.round(base + noise));
-        }
-    } else if (timeframe === '1m') {
-        // Last 30 days
-        for(let i=29; i>=0; i--) {
-            if (metric === 'users' || metric === 'db') base += Math.random() * 5;
-            if (metric === 'active') base = 300 + (Math.random() * 100 - 50);
-
-            const showLabel = i % 5 === 0;
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            const noise = (Math.random() * volatility) - (volatility/2);
-            
-            addPoint(showLabel ? `${d.getDate()}.` : '', Math.round(base + noise));
-        }
-    } else if (timeframe === '6m') {
-         // Last 6 months
-         if (metric === 'users') base = 500; // Reset for longer timeframe simulation
-
-         for(let i=5; i>=0; i--) {
-            base += (metric === 'users' ? 150 : metric === 'db' ? 50 : 0);
-            if (metric === 'active') base = 300 + (Math.random() * 50);
-
-            const noise = (Math.random() * volatility * 2);
-            addPoint(getMonthName(i), Math.round(base + noise));
-         }
-    } else if (timeframe === '1y') {
-        // Last 12 months
-         if (metric === 'users') base = 100;
-
-         for(let i=11; i>=0; i--) {
-            base += (metric === 'users' ? 120 : metric === 'db' ? 40 : 0);
-            if (metric === 'active') base = 300 + (Math.random() * 50);
-
-            const noise = (Math.random() * volatility * 3);
-            addPoint(getMonthName(i), Math.round(base + noise));
-         }
-    }
+    return this.datePipe.transform(dateStr, 'dd.MM') || dateStr;
   }
 
   setTab(tab: 'analytics' | 'content') {
@@ -154,6 +160,26 @@ export class AdminDashboardComponent {
   
   setTimeframe(tf: Timeframe) {
       this.growthTimeframe.set(tf);
+      this.refreshStats();
+  }
+
+  getChartDateRange() {
+    const now = new Date();
+    const start = new Date(now);
+    
+    switch(this.growthTimeframe()) {
+      case '1w': 
+        start.setDate(now.getDate() - 7); 
+        break;
+      case '1m': 
+        start.setDate(now.getDate() - 30); 
+        break;
+      case '1y': 
+        start.setFullYear(now.getFullYear() - 1); 
+        break;
+    }
+    
+    return { start, end: now };
   }
 
   // --- CMS Actions ---
