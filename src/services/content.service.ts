@@ -35,7 +35,6 @@ export class ContentService {
 
   constructor() {
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
-    // Initiales Laden
     this.loadPosts();
   }
 
@@ -47,12 +46,11 @@ export class ContentService {
 
   async loadPosts() {
     this.isLoading.set(true);
-    // Wir laden ALLE Posts für den Admin. 
-    // Später könnten wir für User filtern (z.B. .eq('is_published', true))
+
     const { data, error } = await this.supabase
       .from('inspiration_posts')
       .select('*')
-      .order('id', { ascending: false }); // Neueste zuerst (bei ID sortierung)
+      .order('id', { ascending: false }); // Neueste zuerst
 
     if (error) {
       console.error('Error loading posts:', error);
@@ -63,7 +61,7 @@ export class ContentService {
   }
 
   async createPost(post: InspirationPost) {
-    // Business Logic: Icon automatisch setzen
+    // icon automatisch setzen
     post.icon = this.getIconForCategory(post.category);
 
     const { data, error } = await this.supabase
