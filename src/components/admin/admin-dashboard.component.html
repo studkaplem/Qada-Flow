@@ -7,17 +7,151 @@
     <div class="flex bg-white rounded-lg border border-slate-200 p-1">
         <button (click)="setTab('analytics')" class="px-4 py-2 text-sm font-bold rounded-md transition"
                 [class.bg-slate-800]="activeTab() === 'analytics'" [class.text-white]="activeTab() === 'analytics'">
-                {{ 'admin.tabs.analytics' | translate }}
+                Analytics
         </button>
         <button (click)="setTab('content')" class="px-4 py-2 text-sm font-bold rounded-md transition"
                 [class.bg-slate-800]="activeTab() === 'content'" [class.text-white]="activeTab() === 'content'">
-                {{ 'admin.tabs.cms' | translate }}
+                CMS
         </button>
     </div>
   </div>
 
   @if (activeTab() === 'analytics') {
-     <div class="text-slate-500">Analytics Placeholder...</div>
+    <div class="space-y-8 animate-fade-in">
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <button (click)="selectMetric('users')" 
+                    class="bg-white p-6 rounded-xl border transition-all text-left flex items-center gap-4 hover:shadow-md"
+                    [class.border-blue-500]="selectedMetric() === 'users'"
+                    [class.ring-2]="selectedMetric() === 'users'"
+                    [class.ring-blue-100]="selectedMetric() === 'users'"
+                    [class.border-slate-100]="selectedMetric() !== 'users'">
+                <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Benutzer</p>
+                    <h3 class="text-2xl font-bold text-slate-800">{{ adminService.stats()?.totalUsers || 0 }}</h3>
+                </div>
+            </button>
+
+            <button (click)="selectMetric('active')" 
+                    class="bg-white p-6 rounded-xl border transition-all text-left flex items-center gap-4 hover:shadow-md"
+                    [class.border-emerald-500]="selectedMetric() === 'active'"
+                    [class.ring-2]="selectedMetric() === 'active'"
+                    [class.ring-emerald-100]="selectedMetric() === 'active'"
+                    [class.border-slate-100]="selectedMetric() !== 'active'">
+                <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-pulse"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Aktiv (24h)</p>
+                    <h3 class="text-2xl font-bold text-slate-800">{{ adminService.stats()?.activeToday || 0 }}</h3>
+                </div>
+            </button>
+
+            <button (click)="selectMetric('db')" 
+                    class="bg-white p-6 rounded-xl border transition-all text-left flex items-center gap-4 hover:shadow-md"
+                    [class.border-purple-500]="selectedMetric() === 'db'"
+                    [class.ring-2]="selectedMetric() === 'db'"
+                    [class.ring-purple-100]="selectedMetric() === 'db'"
+                    [class.border-slate-100]="selectedMetric() !== 'db'">
+                <div class="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-database"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">DB Größe</p>
+                    <h3 class="text-2xl font-bold text-slate-800">{{ adminService.stats()?.dbSize || '0 MB' }}</h3>
+                </div>
+            </button>
+
+            <button (click)="selectMetric('cost')" 
+                    class="bg-white p-6 rounded-xl border transition-all text-left flex items-center gap-4 hover:shadow-md"
+                    [class.border-amber-500]="selectedMetric() === 'cost'"
+                    [class.ring-2]="selectedMetric() === 'cost'"
+                    [class.ring-amber-100]="selectedMetric() === 'cost'"
+                    [class.border-slate-100]="selectedMetric() !== 'cost'">
+                <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-dollar-sign"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Est. Cost</p>
+                    <h3 class="text-2xl font-bold text-slate-800">0.00 €</h3>
+                </div>
+            </button>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm transition-all">
+            
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800">{{ getChartTitle() }}</h3>
+                    <p class="text-xs text-slate-400">
+                        @if(selectedMetric() === 'users') { Anzahl Registrierungen }
+                        @if(selectedMetric() === 'active') { Nutzer mit mind. 1 Eintrag }
+                        @if(selectedMetric() === 'db') { Kumulierter Speicherverbrauch }
+                    </p>
+                </div>
+                
+                <div class="flex bg-slate-100 rounded-lg p-1 gap-1">
+                    <button (click)="setTimeframe('1w')" class="px-3 py-1 text-xs font-bold rounded transition"
+                        [class.bg-white]="growthTimeframe() === '1w'" [class.shadow-sm]="growthTimeframe() === '1w'">1W</button>
+                    <button (click)="setTimeframe('1m')" class="px-3 py-1 text-xs font-bold rounded transition"
+                        [class.bg-white]="growthTimeframe() === '1m'" [class.shadow-sm]="growthTimeframe() === '1m'">1M</button>
+                    <button (click)="setTimeframe('1y')" class="px-3 py-1 text-xs font-bold rounded transition"
+                        [class.bg-white]="growthTimeframe() === '1y'" [class.shadow-sm]="growthTimeframe() === '1y'">1Y</button>
+                </div>
+            </div>
+
+            @if (adminService.isLoading()) {
+                <div class="h-64 flex items-center justify-center text-slate-400">
+                    <i class="fa-solid fa-circle-notch fa-spin text-2xl"></i>
+                </div>
+            } @else {
+                
+                <div class="h-64 w-full">
+                    
+                    @if (adminService.stats()?.chartData?.length === 0) {
+                        <div class="h-full flex items-center justify-center text-slate-400 border border-dashed border-slate-200 rounded-lg">
+                            Keine Daten verfügbar
+                        </div>
+                    } @else {
+                        <div class="h-full flex items-end justify-between" 
+                             [class.gap-1]="growthTimeframe() !== '1y'" 
+                             [class.gap-2]="growthTimeframe() === '1y'">
+                            
+                            @for (bar of adminService.stats()?.chartData; track bar.label; let i = $index) {
+                                <div class="flex-1 flex flex-col items-center justify-end h-full group relative">
+                                    
+                                    <div class="absolute bottom-full mb-2 bg-slate-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap z-20 shadow-xl">
+                                        <span class="font-bold">{{ bar.value }}</span> 
+                                        @if(selectedMetric() === 'db'){ MB }
+                                        @if(selectedMetric() === 'cost'){ € }
+                                        <span class="block text-slate-400 font-normal">{{ bar.label }}</span>
+                                    </div>
+
+                                    <div class="w-full rounded-t transition-all duration-500 relative"
+                                         [ngClass]="getBarColorClass()"
+                                         [style.height]="getBarHeight(bar.value)">
+                                    </div>
+
+                                    <div class="h-6 mt-2 flex items-center justify-center w-full">
+                                        @if (shouldShowLabel(i)) {
+                                            <span class="text-[10px] text-slate-400 font-mono whitespace-nowrap overflow-hidden text-ellipsis">
+                                                {{ formatLabel(bar.label) }}
+                                            </span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+    </div>
   }
 
   @if (activeTab() === 'content') {
@@ -28,7 +162,7 @@
                 <i class="fa-solid fa-plus"></i> Neuer Beitrag
             </button>
         </div>
-
+        
         @if (contentService.isLoading()) {
             <div class="py-12 text-center text-slate-400">
                 <i class="fa-solid fa-circle-notch fa-spin text-2xl"></i>
@@ -37,7 +171,7 @@
         }
 
         <div class="grid grid-cols-1 gap-4">
-            @for (post of contentService.posts(); track post.id) {
+             @for (post of contentService.posts(); track post.id) {
                 <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center hover:border-emerald-200 transition">
                     <div class="flex items-start gap-4">
                         <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -66,11 +200,11 @@
      </div>
   }
 
-  @if (isEditorOpen()) {
-    <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in">
-            <div class="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
-                <h3 class="text-xl font-bold text-slate-800">
+    @if (isEditorOpen()) {
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                    <h3 class="text-xl font-bold text-slate-800">
                     {{ editingPostId() ? 'Beitrag bearbeiten' : 'Neuer Beitrag' }}
                 </h3>
                 <button (click)="closeEditor()" class="text-slate-400 hover:text-slate-600">
@@ -94,7 +228,7 @@
                         </select>
                     </div>
                 </div>
-
+                
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-1">Lesezeit</label>
