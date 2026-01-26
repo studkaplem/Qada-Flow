@@ -19,8 +19,31 @@
             "browser": "index.tsx",
             "tsConfig": "tsconfig.json",
             "assets": [
-              "src/logo.svg",
-              "src/manifest.webmanifest"
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "/assets"
+              },
+              {
+                "glob": "favicon.ico",
+                "input": "src",
+                "output": "/"
+              },
+              { 
+                "glob": "*.png", 
+                "input": "src", 
+                "output": "/" 
+              },
+              {
+                "glob": "logo.svg",
+                "input": "src",
+                "output": "/"
+              },
+              {
+                "glob": "manifest.webmanifest",
+                "input": "src",
+                "output": "/"
+              }
             ]
           },
           "configurations": {
