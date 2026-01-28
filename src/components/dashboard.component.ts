@@ -153,10 +153,25 @@ export class DashboardComponent implements OnDestroy {
    * Szenario A: User ändert Kapazität (+/- Buttons)
    * -> Wir berechnen das neue Enddatum
    */
-  updateCapacity(newVal: number) {
-    if (newVal < 1) return;
-    this.tempCapacity.set(newVal);
-    this.recalcDateFromCapacity(newVal);
+  adjustCapacity(delta: number) {
+    const current = this.tempCapacity();
+    let next: number;
+
+    if (delta > 0) {
+      // Erhöhen
+      if (current < 1) next = 1; // Von 0.5 auf 1 springen
+      else next = Math.floor(current) + 1; // Sonst +1
+    }
+    else {
+      // Verringern
+      if (current <= 1) next = 0.5; // Von 1 auf 0.5 springen
+      else next = Math.floor(current) - 1; // Sonst -1
+    }
+    
+    if (next < 0.5) next = 0.5;
+
+    this.tempCapacity.set(next);
+    this.recalcDateFromCapacity(next);
   }
 
   /**
@@ -164,31 +179,35 @@ export class DashboardComponent implements OnDestroy {
    * -> Wir berechnen die nötige Kapazität
    */
   updateTargetDate(dateStr: string) {
-    this.tempTargetDate.set(dateStr);
+   this.tempTargetDate.set(dateStr);
     
     if (!dateStr) return;
 
     const targetDate = new Date(dateStr);
     const today = new Date();
-    
-    // Differenz in Tagen berechnen
     const diffTime = targetDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays <= 0) {
-      // Wenn Datum in Vergangenheit/Heute -> Extrem hohe Capacity nötig
-      // Wir setzen es einfach auf Maximum oder lassen es, um Fehler zu vermeiden
-      return; 
-    }
+    if (diffDays <= 0) return; 
 
     const totalPrayers = this.store.totalMissed();
     
-    // Formel: (Gesamt / Tage) / 6 Gebete pro Set
-    // Beispiel: 3000 Gebete in 100 Tagen = 30 Gebete/Tag = 5 Sets/Tag
+    // Benötigte Gebete pro Tag
     const neededDailyPrayers = totalPrayers / diffDays;
-    const neededSets = Math.ceil(neededDailyPrayers / 6);
+    
+    // Umrechnen in Sets (6 Gebete = 1 Set)
+    const rawSets = neededDailyPrayers / 6;
 
-    this.tempCapacity.set(Math.max(1, neededSets));
+    // Logik: Wenn weniger als 0.5 Sets nötig sind, schlagen wir 0.5 vor.
+    // Ansonsten runden wir auf die nächste ganze Zahl auf.
+    let neededSets: number;
+    if (rawSets <= 0.5) {
+        neededSets = 0.5;
+    } else {
+        neededSets = Math.ceil(rawSets);
+    }
+
+    this.tempCapacity.set(neededSets);
   }
 
   /**
