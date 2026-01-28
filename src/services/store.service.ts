@@ -14,8 +14,7 @@ export interface HabitRule {
   action: string;
   active: boolean;
 }
-// erkläre mir UserSettings
-// 
+
 export interface UserSettings {
   calculationMethod: string;
   startDate: string;
@@ -97,7 +96,7 @@ export class StoreService {
     this.history.set({});
     this.khushuStats.set({});
   }
-
+  
   /**
    * Lädt ALLE relevanten Informationen parallel aus DB und Views
    */
@@ -189,40 +188,88 @@ export class StoreService {
   }
 
   /**
-   * Für den Calculator. Setzt die Schulden initial.
-   * Berechnet die Differenz zum aktuellen Stand und fügt eine Korrektur-Transaktion ein.
+   * Initialisiert oder Aktualisiert die Schulden.
+   * @param debtData Zahl (für alle) oder Objekt (individuell)
+   * @param resetHistory 
+   * - true: "Hard Reset" -> Alles löschen, bei Null anfangen.
+   * - false: "Additiv" -> Neue Schulden werden zu den bestehenden ADDIERT.
    */
-  async initializePrayerCounts(targetCounts: number) {
-    const user = this.auth.currentUser();
-    if (!user) return;
-    
+  async initializePrayerCounts(debtData: number | PrayerCounts, resetHistory: boolean = true) {
     this.isLoading.set(true);
-
-    const current = this.prayerCounts();
-    const updates = [];
-    const types: (keyof PrayerCounts)[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'witr'];
-
-    // Wir berechnen für jeden Gebetstyp das Delta
-    for (const type of types) {
-      const currentVal = current[type] || 0;
-      const delta = targetCounts - currentVal;
-
-      if (delta !== 0) {
-        updates.push({
-          user_id: user.id,
-          prayer_type: type,
-          amount: delta, // Kann positiv (Schuld) oder negativ (Korrektur) sein
-          is_qada: true
-        });
-      }
+    const user = this.auth.currentUser();
+    
+    if (!user) {
+        this.isLoading.set(false);
+        return; 
     }
+
+    const types: (keyof PrayerCounts)[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'witr'];
+    
+    // =========================================================
+    // 1. RESET LOGIK (Nur bei Hard Reset)
+    // =========================================================
+    if (resetHistory) {
+        // ... (Dieser Teil bleibt gleich wie zuvor: Alles löschen) ...
+        const { error } = await this.supabase.from('qada_transactions').delete().eq('user_id', user.id);
+        
+        if (error) {
+            console.error("CRITICAL: Konnte Daten nicht löschen.", error);
+            this.isLoading.set(false);
+            alert("Fehler beim Zurücksetzen.");
+            return;
+        }
+
+        this.completedCounts.set({ ...DEFAULT_COUNTS });
+        this.history.set({});
+        this.khushuStats.set({}); 
+    } 
+    
+    // WICHTIG: Kein 'else { delete... }' mehr! 
+    // Wenn resetHistory=false ist, lassen wir die alten Einträge einfach in der DB.
+
+    // =========================================================
+    // 2. NEUE SCHULDEN HINZUFÜGEN (Additiv)
+    // =========================================================
+    
+    // Wir fügen einfach NEUE Transaktionen hinzu.
+    // SQL View (view_prayer_counts) summiert das automatisch für uns!
+    // Beispiel: Alt = 100, Neu = 50 -> View zeigt 150.
+    
+    const updates = types.map(type => {
+      const amount = typeof debtData === 'number' ? debtData : debtData[type];
+      return {
+        user_id: user.id,
+        prayer_type: type,
+        amount: amount, // Positive Zahl = Schuld wird erhöht
+        is_qada: true
+      };
+    });
 
     if (updates.length > 0) {
       const { error } = await this.supabase.from('qada_transactions').insert(updates);
-      // Update Local State sofort
-      const newCounts = { ...DEFAULT_COUNTS };
-      types.forEach(t => (newCounts as any)[t] = targetCounts);
-      this.prayerCounts.set(newCounts);
+      
+      if (!error) {
+          // Update Local State
+          // Wenn Reset: Setze exakt auf neuen Wert.
+          // Wenn Additiv: Addiere zum aktuellen Wert.
+          
+          this.prayerCounts.update(current => {
+              const newCounts = { ...current };
+              types.forEach(t => {
+                  const addedAmount = typeof debtData === 'number' ? debtData : debtData[t];
+                  
+                  if (resetHistory) {
+                      newCounts[t] = addedAmount; // Reset: Exakter Wert
+                  } else {
+                      newCounts[t] = (current[t] || 0) + addedAmount; // Additiv: Alter Wert + Neuer Wert
+                  }
+              });
+              return newCounts;
+          });
+
+      } else {
+          console.error("Error initializing counts:", error);
+      }
     }
     
     this.isLoading.set(false);
