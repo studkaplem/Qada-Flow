@@ -205,11 +205,8 @@ export class StoreService {
 
     const types: (keyof PrayerCounts)[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'witr'];
     
-    // =========================================================
-    // 1. RESET LOGIK (Nur bei Hard Reset)
-    // =========================================================
+    
     if (resetHistory) {
-        // ... (Dieser Teil bleibt gleich wie zuvor: Alles löschen) ...
         const { error } = await this.supabase.from('qada_transactions').delete().eq('user_id', user.id);
         
         if (error) {
@@ -223,18 +220,9 @@ export class StoreService {
         this.history.set({});
         this.khushuStats.set({}); 
     } 
-    
-    // WICHTIG: Kein 'else { delete... }' mehr! 
-    // Wenn resetHistory=false ist, lassen wir die alten Einträge einfach in der DB.
-
-    // =========================================================
-    // 2. NEUE SCHULDEN HINZUFÜGEN (Additiv)
-    // =========================================================
-    
+   
     // Wir fügen einfach NEUE Transaktionen hinzu.
-    // SQL View (view_prayer_counts) summiert das automatisch für uns!
     // Beispiel: Alt = 100, Neu = 50 -> View zeigt 150.
-    
     const updates = types.map(type => {
       const amount = typeof debtData === 'number' ? debtData : debtData[type];
       return {
@@ -249,9 +237,6 @@ export class StoreService {
       const { error } = await this.supabase.from('qada_transactions').insert(updates);
       
       if (!error) {
-          // Update Local State
-          // Wenn Reset: Setze exakt auf neuen Wert.
-          // Wenn Additiv: Addiere zum aktuellen Wert.
           
           this.prayerCounts.update(current => {
               const newCounts = { ...current };
