@@ -150,7 +150,7 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
         </div>
         
         <div class="text-center mt-6 text-slate-400 text-xs">
-           &copy; 2024 Qada' Flow. Your spiritual journey starts here.
+           &copy; 2026 Qada' Flow. Your spiritual journey starts here.
         </div>
       </div>
     </div>
