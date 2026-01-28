@@ -23,7 +23,17 @@ export const en = {
     opensource_title: "100% Free & Open Source",
     opensource_desc: "Qada' Flow is a Sadaqah Jariyah project. We do not sell your data. We do not show ads.",
     opensource_sub: "Built by the community, supported by voluntary donations.",
-    privacy_badge: "Privacy First: Data stored locally"
+    privacy_badge: "Privacy First: Data stored locally",
+    why_title: "Why Qada' Flow is Different",
+    why_subtitle: "We built this because spreadsheets and guilt trips don't work.",
+    benefit_1_title: "No Shame, Just Strategy",
+    benefit_1_desc: "Your past is between you and Allah. Our tool doesn't judge; it simply organizes your path forward.",
+    benefit_2_title: "The 'Garden' Effect",
+    benefit_2_desc: "Visualize your prayers as a blooming garden. It's addictive—in the best, spiritual way possible.",
+    benefit_3_title: "Realistic Math",
+    benefit_3_desc: "Other apps guess. We calculate cycles, puberty, and breaks precisely so you don't pray a single rakat more than needed.",
+    benefit_4_title: "Dynamic Adaptation",
+    benefit_4_desc: "Got sick? stressful job? Adjust your plan with one click. The plan fits your life, not the other way around.",
   },
   guide: {
     title: "How to use Qada' Flow",

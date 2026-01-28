@@ -1,8 +1,9 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '../pipes/translate.pipe';
 import { TranslationService } from '../services/translation.service';
+import { InspireComponent } from './inspire.component';
 
 @Component({
   selector: 'app-landing',
@@ -117,6 +118,74 @@ import { TranslationService } from '../services/translation.service';
         </div>
       </section>
 
+      <!-- Why Choose Us Section -->
+       <div class="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800 animate-fade-in">
+        <section class="py-24 bg-slate-100 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-100 rounded-full blur-3xl opacity-40 -translate-y-1/2 translate-x-1/2"></div>
+            <div class="absolute bottom-0 left-0 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-40 translate-y-1/2 -translate-x-1/2"></div>
+
+            <div class="max-w-7xl mx-auto px-6 relative z-10">
+                <div class="text-center max-w-3xl mx-auto mb-16">
+                    <h2 class="text-3xl md:text-5xl font-extrabold text-slate-900 mb-6">{{ 'landing.why_title' | translate }}</h2>
+                    <p class="text-lg text-slate-600 leading-relaxed">{{ 'landing.why_subtitle' | translate }}</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    <div class="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition border border-slate-200 flex gap-6 items-start group">
+                        <div class="w-12 h-12 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-heart-crack"></i> </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-800 mb-2">{{ 'landing.benefit_1_title' | translate }}</h3>
+                            <p class="text-slate-500 leading-relaxed">{{ 'landing.benefit_1_desc' | translate }}</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition border border-slate-200 flex gap-6 items-start group">
+                        <div class="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-seedling"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-800 mb-2">{{ 'landing.benefit_2_title' | translate }}</h3>
+                            <p class="text-slate-500 leading-relaxed">{{ 'landing.benefit_2_desc' | translate }}</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition border border-slate-200 flex gap-6 items-start group">
+                        <div class="w-12 h-12 bg-purple-50 text-purple-500 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-calculator"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-800 mb-2">{{ 'landing.benefit_3_title' | translate }}</h3>
+                            <p class="text-slate-500 leading-relaxed">{{ 'landing.benefit_3_desc' | translate }}</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition border border-slate-200 flex gap-6 items-start group">
+                        <div class="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-sliders"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-800 mb-2">{{ 'landing.benefit_4_title' | translate }}</h3>
+                            <p class="text-slate-500 leading-relaxed">{{ 'landing.benefit_4_desc' | translate }}</p>
+                        </div>
+                    </div>
+
+                </div>
+                
+                <div class="mt-16 text-center">
+                  <h3 class="text-2xl font-bold text-slate-800 mb-6 max-w-2xl mx-auto italic">
+                    "{{ dailyQuote().text }}"
+                    <span class="block text-base font-normal text-slate-500 mt-2 not-italic">- {{ dailyQuote().source }}</span>
+                  </h3>
+                  <a routerLink="/login" class="group bg-emerald-600 text-white px-8 py-4 rounded-full text-lg font-bold shadow-lg hover:bg-emerald-700 transition transform hover:-translate-y-1 hover:shadow-xl inline-flex items-center gap-2">
+                    {{ 'landing.cta_start' | translate }} <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                  </a>
+              </div>
+            </div>
+        </section>
+      </div>
+
       <!-- Open Source & Charity Section -->
       <section class="bg-slate-900 text-white py-20 relative overflow-hidden">
         <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')]"></div>
@@ -128,7 +197,7 @@ import { TranslationService } from '../services/translation.service';
           <p class="text-slate-400 text-sm mb-8">{{ 'landing.opensource_sub' | translate }}</p>
           
           <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="#" class="px-6 py-3 bg-white text-slate-900 rounded-lg font-bold hover:bg-slate-200 transition flex items-center justify-center gap-2">
+            <a href="https://github.com/studkaplem/Qada-Flow" target="_blank" class="px-6 py-3 bg-white text-slate-900 rounded-lg font-bold hover:bg-slate-200 transition flex items-center justify-center gap-2">
               <i class="fa-brands fa-github"></i> GitHub Repo
             </a>
             <button class="px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-500 transition flex items-center justify-center gap-2">
@@ -141,7 +210,7 @@ import { TranslationService } from '../services/translation.service';
       <!-- Footer -->
       <footer class="bg-white py-8 border-t border-slate-100">
         <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center text-sm text-slate-400">
-          <p>&copy; 2024 Qada' Flow. Open Source.</p>
+          <p>&copy; 2026 Qada' Flow. Open Source.</p>
           <div class="flex gap-4 mt-4 md:mt-0">
              <a href="#" class="hover:text-emerald-600">Privacy</a>
              <a href="#" class="hover:text-emerald-600">Terms</a>
@@ -155,6 +224,11 @@ import { TranslationService } from '../services/translation.service';
 })
 export class LandingComponent {
   ts = inject(TranslationService);
+
+  dailyQuote = computed(() => {
+     const q = this.ts.currentDictionary()?.inspire?.quote;
+     return q || { text: 'Loading...', source: '' };
+  });
 
   switchLang(lang: 'en' | 'de' | 'tr') {
     this.ts.setLanguage(lang);

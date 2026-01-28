@@ -23,7 +23,17 @@ export const tr = {
     opensource_title: "%100 Ücretsiz & Açık Kaynak",
     opensource_desc: "Qada' Flow bir Sadaka-i Cariye projesidir. Verilerinizi satmıyoruz. Reklam göstermiyoruz.",
     opensource_sub: "Topluluk tarafından geliştirildi, gönüllü bağışlarla destekleniyor.",
-    privacy_badge: "Önce Gizlilik: Yerel Depolama"
+    privacy_badge: "Önce Gizlilik: Yerel Depolama",
+    why_title: "Neden Qada' Flow Farklı?",
+    why_subtitle: "Bunu geliştirdik çünkü Excel tabloları ve suçluluk duygusu işe yaramıyor.",
+    benefit_1_title: "Utanç Yok, Sadece Strateji",
+    benefit_1_desc: "Geçmişin seninle Allah arasındadır. Aracımız yargılamaz, sadece ileriye giden yolunu düzenler.",
+    benefit_2_title: "'Bahçe' Etkisi",
+    benefit_2_desc: "Namazlarını çiçek açan bir bahçe olarak görselleştir. Bu, manevi anlamda bağımlılık yapar.",
+    benefit_3_title: "Gerçekçi Matematik",
+    benefit_3_desc: "Diğerleri tahmin eder. Biz döngüleri ve ergenliği hassas hesaplarız, böylece fazladan bir rekat bile kılmazsın.",
+    benefit_4_title: "Dinamik Uyarlama",
+    benefit_4_desc: "Hastalandın mı? İşin mi yoğun? Planını tek tıkla düzenle. Plan hayatına uyar, tersi değil.",
   },
   guide: {
     title: "Qada' Flow Nasıl Kullanılır?",
