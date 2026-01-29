@@ -1,6 +1,6 @@
 
 import { bootstrapApplication } from '@angular/platform-browser';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, isDevMode } from '@angular/core';
 import { provideRouter, withHashLocation, Routes } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { AppComponent } from './src/app.component';
@@ -16,6 +16,7 @@ import { LandingComponent } from './src/components/landing.component';
 import { AdminDashboardComponent } from './src/components/admin/admin-dashboard.component';
 import { authGuard, guestGuard } from './src/guards/auth.guard';
 import { adminGuard } from './src/guards/admin.guard';
+import { provideServiceWorker } from '@angular/service-worker';
 
 const routes: Routes = [
   // Public Routes (Guest Guard protects from already logged-in users)
@@ -42,7 +43,10 @@ bootstrapApplication(AppComponent, {
   providers: [
     provideZonelessChangeDetection(),
     provideHttpClient(),
-    provideRouter(routes, withHashLocation())
+    provideRouter(routes, withHashLocation()), provideServiceWorker('ngsw-worker.js', {
+            enabled: !isDevMode(),
+            registrationStrategy: 'registerWhenStable:30000'
+          })
   ]
 }).catch(err => console.error(err));
 
