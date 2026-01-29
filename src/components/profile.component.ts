@@ -6,6 +6,7 @@ import { StoreService } from '../services/store.service';
 import { TranslationService } from '../services/translation.service';
 import { Router } from '@angular/router';
 import { TranslatePipe } from '../pipes/translate.pipe';
+import { NotificationService } from '../services/notification.service';
 
 @Component({
   selector: 'app-profile',
@@ -19,6 +20,7 @@ export class ProfileComponent {
   ts = inject(TranslationService);
   private fb = inject(FormBuilder);
   private router = inject(Router);
+  private notificationService = inject(NotificationService);
 
   // UI State
   activeTab = signal<'overview' | 'settings'>('overview');
