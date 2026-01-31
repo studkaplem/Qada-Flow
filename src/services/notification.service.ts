@@ -23,9 +23,12 @@ export class NotificationService {
     }
 
     try {
+      // Wir bereinigen den Key, damit Chrome ihn akzeptiert (Base64URL -> Base64)
+      let key = environment.vapidPublicKey.trim(); // Leerzeichen/Newlines weg
+      
       // 2. Browser Popup: "Darf Qada Flow dir Nachrichten senden?"
       const sub = await this.swPush.requestSubscription({
-        serverPublicKey: environment.vapidPublicKey
+        serverPublicKey: key
       });
 
       // 3. User ID holen
@@ -35,26 +38,26 @@ export class NotificationService {
           return;
       }
 
-      // 4. In Supabase speichern (Upsert verhindert Duplikate dank UNIQUE constraint)
+      // 4. In Supabase speichern
       const { error } = await this.supabase
         .from('push_subscriptions')
         .upsert({
           user_id: user.id,
           subscription: sub.toJSON(),
-          // Optional: User Agent speichern für Debugging (z.B. "Chrome on Mac")
           user_agent: navigator.userAgent 
         }, { onConflict: 'user_id, subscription' });
       
       if (error) {
           console.error('Fehler beim Speichern der Subscription:', error);
       } else {
-          console.log('Erfolgreich für Push registriert! 🚀');
+          console.log('Erfolgreich für Push registriert!');
           alert("Erfolgreich aktiviert! Du erhältst nun Motivation an Montagen und Freitagen.");
       }
 
     } catch (err) {
       console.error('Konnte keine Push-Erlaubnis erhalten', err);
-      alert("Konnte keine Erlaubnis erhalten. Bitte prüfe deine Browser-Einstellungen.");
+      // Hier geben wir dem User Feedback, falls es immer noch klemmt
+      alert("Konnte keine Erlaubnis erhalten. Bitte prüfe, ob Benachrichtigungen für diese Seite blockiert sind.");
     }
   }
 }
