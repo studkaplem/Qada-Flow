@@ -1,32 +1,27 @@
 const fs = require('fs');
-// Versuche dotenv zu laden (nur für lokale Entwicklung relevant)
+// for local development, load .env variables
 try {
   require('dotenv').config();
 } catch (e) {
-  // Auf Vercel ist dotenv nicht installiert/nötig, da Variablen dort gesetzt sind.
-  // Wir ignorieren den Fehler einfach.
 }
 
-// 1. Ordner erstellen
 const dir = './src/environments';
 if (!fs.existsSync(dir)) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
-// 2. Werte holen
-// dotenv füllt process.env lokal. Vercel füllt process.env automatisch.
+// read dotenv variables
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
 
-// Sicherheits-Check: Warnen, wenn Variablen fehlen
+// check if all variables are present
 if (!supabaseUrl || !supabaseKey || !vapidPublicKey) {
   console.error('WARNUNG: Umgebungsvariablen fehlen! Die App wird eventuell nicht funktionieren.');
   console.error('Lokal: Prüfe deine .env Datei.');
   console.error('Vercel: Prüfe deine Environment Variables in den Settings.');
 }
 
-// 3. Inhalt der Datei definieren
 const envConfigFile = `
 export const environment = {
   production: true,
@@ -36,7 +31,7 @@ export const environment = {
 };
 `;
 
-// 4. Datei schreiben
+//  write the content to environment.ts file
 const targetPath = './src/environments/environment.ts';
 fs.writeFileSync(targetPath, envConfigFile);
 
