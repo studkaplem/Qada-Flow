@@ -133,14 +133,24 @@ Deno.serve(async (req) => {
       if (subs) {
         for (const sub of subs) {
           try {
-            await webpush.sendNotification(sub.subscription, JSON.stringify({
+          
+          const payload = JSON.stringify({
+            notification: {
               title: notif.title,
               body: notif.body,
-              icon: "/assets/icons/icon-192x192.png",
-              badge: "/assets/icons/icon-72x72.png"
-            }));
-            results.push({ user: notif.userId, status: 'sent' });
-            console.log("Push gesendet!");
+              icon: "https://qada-flow-d9vz.vercel.app/assets/icons/icon-192x192.png",
+              badge: "https://qada-flow-d9vz.vercel.app/assets/icons/icon-72x72.png",
+              vibrate: [100, 50, 100],
+              data: {
+                url: "https://qada-flow-d9vz.vercel.app/#/dashboard"
+              }
+            }
+          });
+
+          await webpush.sendNotification(sub.subscription, payload);
+          results.push({ user: notif.userId, status: 'sent' });
+          console.log("Push gesendet!");
+
           } catch (err) {
             console.error("Push Fehler:", err);
             if (err.statusCode === 410) {
