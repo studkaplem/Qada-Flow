@@ -1,5 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import webpush from 'https://esm.sh/web-push@3.6.3'
+import { createClient } from 'npm:@supabase/supabase-js@2'
+import webpush from 'npm:web-push@3.6.3'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -33,15 +33,22 @@ const MILESTONES = {
 
 Deno.serve(async (req) => {
   try {
-    // Wir empfangen Daten vom Cronjob oder vom Datenbank-Webhook
-    const { record, type } = await req.json()
-    
-    let notifications = [] // Hier sammeln wir alle Nachrichten, die raus müssen
+    console.log("--> Request erhalten!");
 
-    // ==========================================
-    // SZENARIO 1: CRONJOB (Montag & Freitag)
-    // ==========================================
+    // Prüfen ob Body leer ist
+    if (!req.body) {
+        return new Response("No body", { status: 400 });
+    }
+
+    const body = await req.json();
+    console.log("Payload Type:", body.type);
+
+    const { record, type } = body;
+    let notifications = [];
+
+    // --- FALL 1: CRONJOB ---
     if (type === 'WEEKLY_MOTIVATION') {
+      console.log("Typ: Weekly Motivation");
       const today = new Date();
       const day = today.getDay(); // 0=Sonntag, 1=Montag, ... 5=Freitag
       
@@ -63,78 +70,82 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ==========================================
-    // SZENARIO 2: MEILENSTEIN (Datenbank Trigger)
-    // ==========================================
-    // record existiert nur, wenn der Aufruf vom DB-Webhook kommt
-    else if (record && record.amount < 0) {
-      const userId = record.user_id;
-      const justCompleted = Math.abs(record.amount); 
+    // --- FALL 2: MEILENSTEIN (Webhook) ---
+    else if (record) {
+      console.log(`Typ: Webhook Insert. Amount: ${record.amount}`);
 
-      // Wir rufen die SQL-Funktion auf, die wir in Schritt 1.1 erstellt haben
-      const { data: stats } = await supabase.rpc('get_user_total_stats', { uid: userId });
+      if (record.amount < 0) {
+        const userId = record.user_id;
+        const justCompleted = Math.abs(record.amount);
 
-      // Check: Haben wir Daten bekommen? (stats ist ein Array)
-      if (stats && stats[0]) {
-        const totalDone = stats[0].total_done;     
-        const totalOpen = stats[0].total_open;     
-        const totalGoal = totalDone + totalOpen; 
+        // RPC Aufruf
+        const { data: stats, error } = await supabase.rpc('get_user_total_stats', { uid: userId });
 
-        if (totalGoal > 0) {
-          // Mathe: Wo stehen wir jetzt? Wo waren wir vor dem Eintrag?
-          const currentPercent = (totalDone / totalGoal) * 100;
-          const prevPercent = ((totalDone - justCompleted) / totalGoal) * 100;
+        if (error) {
+           console.error("RPC Error:", error);
+           return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+        }
 
-          // Prüfen, ob wir eine Schwelle (25, 50, 75, 100) überschritten haben
-          const thresholds = [25, 50, 75, 100];
-          
-          for (const t of thresholds) {
-            // Logik: War ich vorher unter X% und bin jetzt drüber?
-            if (prevPercent < t && currentPercent >= t) {
-              notifications.push({
-                userId: userId,
-                title: "Meilenstein erreicht! 🎉",
-                body: MILESTONES[t as keyof typeof MILESTONES] || `Du hast ${t}% erreicht!`
-              });
-              break; // Nur den höchsten Meilenstein feiern, nicht mehrere gleichzeitig
+        console.log("Stats:", stats); // Debug 3
+
+        if (stats && stats[0]) {
+          const totalDone = Number(stats[0].total_done);
+          const totalOpen = Number(stats[0].total_open);
+          const totalGoal = totalDone + totalOpen;
+
+          console.log(`Mathe: Done=${totalDone}, Goal=${totalGoal}`); // Debug 4
+
+          if (totalGoal > 0) {
+            const currentPercent = (totalDone / totalGoal) * 100;
+            const prevPercent = ((totalDone - justCompleted) / totalGoal) * 100;
+
+            console.log(`Sprung: ${prevPercent.toFixed(2)}% -> ${currentPercent.toFixed(2)}%`); // Debug 5
+
+            const thresholds = [25, 50, 75, 100];
+            
+            for (const t of thresholds) {
+              if (prevPercent < t && currentPercent >= t) {
+                console.log(`TREFFER! ${t}% erreicht.`);
+                notifications.push({
+                  userId: userId,
+                  title: "Meilenstein erreicht! 🎉",
+                  body: MILESTONES[t as keyof typeof MILESTONES] || `Du hast ${t}% erreicht!`
+                });
+                break; 
+              }
             }
           }
         }
       }
     }
 
-    // ==========================================
-    // SENDEN (An Google/Apple Server schicken)
-    // ==========================================
     if (notifications.length === 0) {
-      return new Response(JSON.stringify({ message: "Nichts zu senden" }), { headers: { "Content-Type": "application/json" } });
+      console.log("--> Nichts zu senden.");
+      return new Response(JSON.stringify({ message: "Kein Trigger" }), { headers: { "Content-Type": "application/json" } });
     }
 
+    // --- SENDEN ---
+    console.log(`Sende ${notifications.length} Nachrichten...`);
     const results = [];
     
     for (const notif of notifications) {
-      // Jetzt holen wir die echten Browser-Keys für diesen User
-      const { data: subs } = await supabase
-        .from('push_subscriptions')
-        .select('subscription')
-        .eq('user_id', notif.userId);
-
+      const { data: subs } = await supabase.from('push_subscriptions').select('subscription').eq('user_id', notif.userId);
       if (subs) {
         for (const sub of subs) {
           try {
             await webpush.sendNotification(sub.subscription, JSON.stringify({
               title: notif.title,
               body: notif.body,
-              icon: "/assets/icons/icon-192x192.png", // Stelle sicher, dass dieses Icon existiert!
+              icon: "/assets/icons/icon-192x192.png",
               badge: "/assets/icons/icon-72x72.png"
             }));
             results.push({ user: notif.userId, status: 'sent' });
+            console.log("Push gesendet!");
           } catch (err) {
-             console.error(`Fehler bei User ${notif.userId}`, err);
-             // Fehler 410 = User hat Abo gelöscht oder Berechtigung entzogen -> Aus DB löschen
-             if (err.statusCode === 410) {
+            console.error("Push Fehler:", err);
+            if (err.statusCode === 410) {
                await supabase.from('push_subscriptions').delete().match({ subscription: sub.subscription });
-             }
+            }
           }
         }
       }
@@ -143,6 +154,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ sent: results.length }), { headers: { "Content-Type": "application/json" } });
 
   } catch (err) {
+    console.error("CRITICAL CRASH:", err);
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 })
