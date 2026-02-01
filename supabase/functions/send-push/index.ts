@@ -129,37 +129,41 @@ Deno.serve(async (req) => {
     const results = [];
     
     for (const notif of notifications) {
-      const { data: subs } = await supabase.from('push_subscriptions').select('subscription').eq('user_id', notif.userId);
-      if (subs) {
-        for (const sub of subs) {
-          try {
-          
-          const payload = JSON.stringify({
-            notification: {
-              title: notif.title,
-              body: notif.body,
-              icon: "https://qada-flow-d9vz.vercel.app/assets/icons/icon-192x192.png",
-              badge: "https://qada-flow-d9vz.vercel.app/assets/icons/icon-72x72.png",
-              vibrate: [100, 50, 100],
-              data: {
-                url: "https://qada-flow-d9vz.vercel.app/#/dashboard"
+      const { data: subs } = await supabase
+        .from('push_subscriptions')
+        .select('subscription')
+        .eq('user_id', notif.userId);
+
+        if (subs) {
+          for (const sub of subs) {
+            try {
+              const payload = JSON.stringify({
+                notification: {
+                  title: notif.title,
+                  body: notif.body,
+                  icon: "https://qada-flow-d9vz.vercel.app/assets/icons/icon-192x192.png",
+                  badge: "https://qada-flow-d9vz.vercel.app/assets/icons/icon-72x72.png",
+                  vibrate: [100, 50, 100],
+                  data: {
+                    url: "https://qada-flow-d9vz.vercel.app/#/dashboard",
+                    arrivalDate: Date.now()
+                  }
+                }
+              });
+
+              await webpush.sendNotification(sub.subscription, payload);
+              results.push({ user: notif.userId, status: 'sent' });
+              console.log("Push korrekt gesendet (mit notification-Wrapper)!");
+
+            } catch (err) {
+              console.error(`Fehler bei User ${notif.userId}`, err);
+              if (err.statusCode === 410) {
+                await supabase.from('push_subscriptions').delete().match({ subscription: sub.subscription });
               }
-            }
-          });
-
-          await webpush.sendNotification(sub.subscription, payload);
-          results.push({ user: notif.userId, status: 'sent' });
-          console.log("Push gesendet!");
-
-          } catch (err) {
-            console.error("Push Fehler:", err);
-            if (err.statusCode === 410) {
-               await supabase.from('push_subscriptions').delete().match({ subscription: sub.subscription });
             }
           }
         }
       }
-    }
 
     return new Response(JSON.stringify({ sent: results.length }), { headers: { "Content-Type": "application/json" } });
 
