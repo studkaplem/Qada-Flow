@@ -158,37 +158,55 @@ export class StoreService {
     const user = this.auth.currentUser();
     if (!user) return;
 
-    // Optimistic Update Schulden
-    this.prayerCounts.update(c => ({ ...c, [type]: Math.max(0, (c[type] || 0) + change) }));
-    
-    // Optimistic Update Erledigt & History (nur wenn change negativ ist)
-    if (change < 0) {
-        this.completedCounts.update(c => ({ ...c, [type]: (c[type] || 0) + 1 }));
+    // Rollback
+    const prevMissed = this.prayerCounts();
+    const prevCompleted = this.completedCounts();
+    const prevHistory = this.history();
+    const prevKhushu = this.khushuStats();
 
-        // History Log für Garden
-        const today = new Date().toISOString().split('T')[0];
-        this.history.update(h => ({ ...h, [today]: (h[today] || 0) + 1 }));
+    try {
+      // OPTIMISTIC UPDATE
+      this.prayerCounts.update(c => ({ ...c, [type]: Math.max(0, (c[type] || 0) + change) }));
+      
+      if (change < 0) {
+          this.completedCounts.update(c => ({ ...c, [type]: (c[type] || 0) + 1 }));
 
-        // Khushu Stats (optional, nur wenn vom Tracker übergeben)
-        if (khushuRating !== undefined && khushuRating !== null) {
-             this.khushuStats.update(k => {
-                const current = k[type] || { totalScore: 0, count: 0 };
-                return { ...k, [type]: { totalScore: current.totalScore + khushuRating, count: current.count + 1 }};
-            });
-        }
+          const today = new Date().toISOString().split('T')[0];
+          this.history.update(h => ({ ...h, [today]: (h[today] || 0) + 1 }));
+
+          if (khushuRating !== undefined && khushuRating !== null) {
+               this.khushuStats.update(k => {
+                  const current = k[type] || { totalScore: 0, count: 0 };
+                  return { ...k, [type]: { totalScore: current.totalScore + khushuRating, count: current.count + 1 }};
+              });
+          }
+      }
+
+      // SERVER CALL (RPC statt Insert)
+      const { error } = await this.supabase.rpc('track_prayer', {
+        p_prayer_type: type,
+        p_amount: change,
+        p_khushu: khushuRating || null
+      });
+
+      if (error) throw error; 
+
+    } catch (err) {
+      console.error('[Store] Transaction failed (Security/Network), rolling back:', err);
+      
+      // ROLLBACK (Falls Netzwerkfehler)
+      this.prayerCounts.set(prevMissed);
+      this.completedCounts.set(prevCompleted);
+      this.history.set(prevHistory);
+      this.khushuStats.set(prevKhushu);
+      
+      // TODO: snackbar notification statt alert einbauen mit localisation
+      alert("Speichern fehlgeschlagen. Bitte Verbindung prüfen.");
     }
-
-    await this.supabase.from('qada_transactions').insert({
-      user_id: user.id,
-      prayer_type: type,
-      amount: change,
-      khushu_rating: khushuRating || null,
-      is_qada: true
-    });
   }
 
   /**
-   * Initialisiert oder Aktualisiert die Schulden.
+   * Initialisiert oder Aktualisiert die Schulden (SECURE RPC VERSION)
    * @param debtData Zahl (für alle) oder Objekt (individuell)
    * @param resetHistory 
    * - true: "Hard Reset" -> Alles löschen, bei Null anfangen.
@@ -205,56 +223,52 @@ export class StoreService {
 
     const types: (keyof PrayerCounts)[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'witr'];
     
-    
-    if (resetHistory) {
-        const { error } = await this.supabase.from('qada_transactions').delete().eq('user_id', user.id);
-        
-        if (error) {
-            console.error("CRITICAL: Konnte Daten nicht löschen.", error);
-            this.isLoading.set(false);
-            alert("Fehler beim Zurücksetzen.");
-            return;
-        }
-
-        this.completedCounts.set({ ...DEFAULT_COUNTS });
-        this.history.set({});
-        this.khushuStats.set({}); 
-    } 
-   
-    // Wir fügen einfach NEUE Transaktionen hinzu.
-    // Beispiel: Alt = 100, Neu = 50 -> View zeigt 150.
-    const updates = types.map(type => {
-      const amount = typeof debtData === 'number' ? debtData : debtData[type];
-      return {
-        user_id: user.id,
-        prayer_type: type,
-        amount: amount, // Positive Zahl = Schuld wird erhöht
-        is_qada: true
-      };
+    const payload: any = {};
+    types.forEach(t => {
+       // Wenn debtData eine Zahl ist (z.B. 500), gilt sie für alle. Sonst pro Typ.
+       payload[t] = typeof debtData === 'number' ? debtData : debtData[t];
     });
 
-    if (updates.length > 0) {
-      const { error } = await this.supabase.from('qada_transactions').insert(updates);
-      
-      if (!error) {
-          
-          this.prayerCounts.update(current => {
-              const newCounts = { ...current };
-              types.forEach(t => {
-                  const addedAmount = typeof debtData === 'number' ? debtData : debtData[t];
-                  
-                  if (resetHistory) {
-                      newCounts[t] = addedAmount; // Reset: Exakter Wert
-                  } else {
-                      newCounts[t] = (current[t] || 0) + addedAmount; // Additiv: Alter Wert + Neuer Wert
-                  }
-              });
-              return newCounts;
-          });
+    const previousCounts = { ...this.prayerCounts() };
+    const previousHistory = { ...this.history() };
+    const previousCompleted = { ...this.completedCounts() };
+    const previousKhushu = { ...this.khushuStats() };
 
-      } else {
-          console.error("Error initializing counts:", error);
-      }
+    // optimistic update
+    this.prayerCounts.update(current => {
+        const newCounts = { ...current };
+        types.forEach(t => {
+            const addedAmount = payload[t];
+            if (resetHistory) {
+                newCounts[t] = addedAmount;
+            } else {
+                newCounts[t] = (current[t] || 0) + addedAmount;
+            }
+        });
+        return newCounts;
+    });
+
+    if (resetHistory) {
+        this.completedCounts.set({ fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0, witr: 0 });
+        this.history.set({});
+        this.khushuStats.set({});
+    }
+
+    const { error } = await this.supabase.rpc('initialize_prayer_debt', {
+        p_debt_data: payload,
+        p_reset_history: resetHistory
+    });
+      
+    if (error) {
+        alert("Fehler beim Speichern. Änderungen werden rückgängig gemacht.");
+        
+        // Rollback
+        this.prayerCounts.set(previousCounts);
+        if (resetHistory) {
+            this.history.set(previousHistory);
+            this.completedCounts.set(previousCompleted);
+            this.khushuStats.set(previousKhushu);
+        }
     }
     
     this.isLoading.set(false);
