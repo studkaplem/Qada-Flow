@@ -201,7 +201,9 @@ import { InspireComponent } from './inspire.component';
               <i class="fa-brands fa-github"></i> GitHub Repo
             </a>
             <button class="px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-500 transition flex items-center justify-center gap-2">
-              <i class="fa-solid fa-heart"></i> Donate (Sadaqah)
+              <a href="https://www.paypal.com/pools/c/9mn0p2Gee4" target="_blank">
+                <i class="fa-solid fa-heart"></i> Donate (Sadaqah)
+              </a>  
             </button>
           </div>
         </div>
