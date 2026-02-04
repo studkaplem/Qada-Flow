@@ -1,11 +1,11 @@
 import { Component, ElementRef, ViewChild, effect, inject, signal, HostListener, computed, OnDestroy } from '@angular/core';
-import { StoreService, PrayerCounts } from '../services/store.service';
-import { PrayerService } from '../services/prayer.service';
+import { StoreService, PrayerCounts } from '../../services/store.service';
+import { PrayerService } from '../../services/prayer.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { GardenComponent } from './garden.component';
+import { GardenComponent } from '../garden/garden.component';
 import { RouterLink } from '@angular/router';
-import { TranslatePipe } from '../pipes/translate.pipe';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 import * as d3 from 'd3';
 
 type ChartType = 'bar' | 'radial' | 'trend' | 'heatmap' | 'radar';

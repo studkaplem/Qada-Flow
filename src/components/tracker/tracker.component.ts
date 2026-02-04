@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
-import { StoreService, PrayerCounts } from '../services/store.service';
+import { StoreService, PrayerCounts } from '../../services/store.service';
 import { CommonModule } from '@angular/common';
-import { TranslatePipe } from '../pipes/translate.pipe';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 @Component({
   selector: 'app-tracker',

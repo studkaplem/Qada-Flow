@@ -1,8 +1,8 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { TranslatePipe } from '../pipes/translate.pipe';
-import { TranslationService } from '../services/translation.service';
-import { ContentService, InspirationPost } from '../services/content.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
+import { TranslationService } from '../../services/translation.service';
+import { ContentService, InspirationPost } from '../../services/content.service';
 
 @Component({
   selector: 'app-inspire',

@@ -1,9 +1,9 @@
 import { Component, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { TranslatePipe } from '../pipes/translate.pipe';
-import { TranslationService } from '../services/translation.service';
-import { InspireComponent } from './inspire.component';
+import { TranslatePipe } from '../../pipes/translate.pipe';
+import { TranslationService } from '../../services/translation.service';
+import { InspireComponent } from '../inspire/inspire.component';
 
 @Component({
   selector: 'app-landing',

@@ -1,8 +1,8 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { StoreService, PrayerCounts } from '../services/store.service';
+import { StoreService, PrayerCounts } from '../../services/store.service';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '../pipes/translate.pipe';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 import { CommonModule } from '@angular/common'; 
 
 interface QadaPeriod {

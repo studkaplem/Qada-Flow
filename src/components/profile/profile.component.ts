@@ -1,12 +1,12 @@
 import { Component, inject, signal, effect, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { AuthService } from '../services/auth.service';
-import { StoreService } from '../services/store.service';
-import { TranslationService } from '../services/translation.service';
+import { AuthService } from '../../services/auth.service';
+import { StoreService } from '../../services/store.service';
+import { TranslationService } from '../../services/translation.service';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '../pipes/translate.pipe';
-import { NotificationService } from '../services/notification.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-profile',

@@ -1,6 +1,6 @@
 import { Component, ElementRef, ViewChild, effect, inject, input, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { TranslatePipe } from '../pipes/translate.pipe';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 declare var d3: any;
 
